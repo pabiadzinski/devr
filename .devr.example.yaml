@@ -1,0 +1,18 @@
+# All values shown are defaults.
+# Copy to .devr.yaml and adjust as needed.
+
+build:
+  cmd_pattern: "cmd/*/main.go"
+  flags: ["-race"]
+
+run:
+  env_file: ""  # explicit: .env, .env.local, etc.
+
+watch:
+  dirs: ["."]
+  extensions: [".go"]
+  exclude: ["vendor", "node_modules"]
+  debounce: 500ms
+
+test:
+  cover_profile: coverage.out

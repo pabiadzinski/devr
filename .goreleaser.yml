@@ -1,0 +1,33 @@
+version: 2
+
+builds:
+  - main: ./cmd/devr
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - formats:
+      - tar.gz
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  filters:
+    exclude:
+      - "^docs:"
+      - "^chore:"
+
+homebrew_casks:
+  - repository:
+      owner: pabiadzinski
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/pabiadzinski/devr
+    description: Zero-config dev runner for Go projects

@@ -1,0 +1,33 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - bodyclose
+    - durationcheck
+    - errorlint
+    - copyloopvar
+    - fatcontext
+    - gocritic
+    - misspell
+    - nilerr
+    - unconvert
+    - unparam
+    - wastedassign
+    - wsl_v5
+  settings:
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
+      disabled-checks:
+        - ifElseChain
+        - hugeParam
+
+formatters:
+  enable:
+    - gofmt
