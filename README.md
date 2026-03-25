@@ -115,11 +115,23 @@ watch:
   exclude: ["vendor", "node_modules"]
   debounce: 500ms
 
+logs:
+  format: auto          # auto, json, or text
+  level_field: level    # JSON field or key=value field for level
+  level_values:
+    error: ["error", "err", "fatal"]
+    warn: ["warn", "warning"]
+    info: ["info"]
+    debug: ["debug", "trace"]
+  highlight_fields: ["msg"]
+
 test:
   cover_profile: "coverage.out"
 
 notify: true  # macOS desktop notifications on build/crash failures
 ```
+
+By default, `devr` uses `logs.format: auto`: it first tries JSON logs, then falls back to plain text / `key=value` parsing. This works out of the box for logs like `{"level":"info","msg":"ready"}`, `INFO server started`, or `lvl=warning msg="slow query"` if you set `level_field: lvl`.
 
 Without a config file, devr uses sensible defaults – it just works.
 

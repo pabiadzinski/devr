@@ -16,8 +16,9 @@ type LogViewOptions struct {
 	OnStop          func()
 	OnExit          func()
 	Title           string
-	ExitCh          <-chan error
+	Logs            ConfigLogs
 	HighlightFields []string
+	ExitCh          <-chan error
 }
 
 func RunLogView(opts LogViewOptions) error {
@@ -28,9 +29,10 @@ func RunLogView(opts LogViewOptions) error {
 
 	m := newModel()
 	m.title = opts.Title
+	m.parser = newLogParser(opts.Logs)
 	m.highlightFields = opts.HighlightFields
 
-	m.lines, m.filtered = loadLines(f)
+	m.lines, m.filtered = loadLines(f, m.parser)
 	if len(m.filtered) > 0 {
 		m.cursor = len(m.filtered) - 1
 	}
@@ -75,7 +77,7 @@ func RunLogView(opts LogViewOptions) error {
 	return err
 }
 
-func loadLines(f *os.File) ([]logEntry, []int) {
+func loadLines(f *os.File, parser logParser) ([]logEntry, []int) {
 	var (
 		lines    []logEntry
 		filtered []int
@@ -83,7 +85,7 @@ func loadLines(f *os.File) ([]logEntry, []int) {
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
-		entry := parseLine(scanner.Text())
+		entry := parser.Parse(scanner.Text())
 		lines = append(lines, entry)
 		filtered = append(filtered, len(lines)-1)
 	}

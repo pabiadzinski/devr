@@ -30,7 +30,7 @@ func (m logViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case lineMsg:
-		m.appendLine(parseLine(string(msg)))
+		m.appendLine(m.parser.Parse(string(msg)))
 		return m, nil
 
 	case tea.KeyMsg:

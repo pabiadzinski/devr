@@ -133,3 +133,49 @@ func TestLogViewFooterTextReflectsModes(t *testing.T) {
 	m.ctrlCOnce = true
 	assert.Contains(t, m.footerText(), "Press Ctrl+C again")
 }
+
+func TestLogParserJSONCustomLevelField(t *testing.T) {
+	parser := newLogParser(ConfigLogs{
+		Format:     "json",
+		LevelField: "severity",
+		LevelValues: ConfigLogLevels{
+			Error: []string{"critical"},
+		},
+	})
+
+	entry := parser.Parse(`{"severity":"critical","message":"boom"}`)
+	assert.Equal(t, levelError, entry.level)
+}
+
+func TestLogParserTextCustomLevelField(t *testing.T) {
+	parser := newLogParser(ConfigLogs{
+		Format:     "text",
+		LevelField: "lvl",
+		LevelValues: ConfigLogLevels{
+			Warn: []string{"warning"},
+		},
+	})
+
+	entry := parser.Parse(`ts=2026-03-17T10:15:00Z lvl=warning msg="slow db"`)
+	assert.Equal(t, levelWarn, entry.level)
+}
+
+func TestLogParserAutoFallsBackToText(t *testing.T) {
+	parser := newLogParser(DefaultConfig().Logs)
+
+	entry := parser.Parse(`INFO server started`)
+	assert.Equal(t, levelInfo, entry.level)
+}
+
+func TestLogParserAutoParsesJSONWithCustomAliases(t *testing.T) {
+	parser := newLogParser(ConfigLogs{
+		Format:     "auto",
+		LevelField: "lvl",
+		LevelValues: ConfigLogLevels{
+			Debug: []string{"trace"},
+		},
+	})
+
+	entry := parser.Parse(`{"lvl":"trace","msg":"details"}`)
+	assert.Equal(t, levelDebug, entry.level)
+}

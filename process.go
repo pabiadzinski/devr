@@ -143,15 +143,15 @@ func (a *App) BuildAndStart(pkg string) (int, <-chan error, error) {
 func (a *App) runtimeEnv() []string {
 	env := os.Environ()
 
-	envFile := a.EnvFile
-	if envFile == "" {
-		envFile = a.Cfg.Run.EnvFile
+	if a.NoEnv || a.Cfg.Run.NoEnv {
+		return env
 	}
 
-	if envFile != "" {
-		if extra, err := loadEnvFile(filepath.Join(a.WorkDir, envFile)); err == nil {
-			env = append(env, extra...)
-		}
+	envFile := a.Cfg.Run.EnvFile
+	path := filepath.Join(a.WorkDir, envFile)
+
+	if extra, err := loadEnvFile(path); err == nil {
+		env = append(env, extra...)
 	}
 
 	return env

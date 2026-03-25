@@ -20,13 +20,13 @@ func cmdApp(a *App) Command {
 }
 
 func cmdRun(a *App) Command {
-	var envFile string
+	var noEnv bool
 
 	return Command{
 		Name: "run", Usage: "Build & run Go app with log viewer", Args: "[pkg]",
-		Flags: []Flag{{Name: "env", Short: "e", Usage: "Load env file", Value: &envFile}},
+		Flags: []Flag{{Name: "no-env", Usage: "Skip loading .env file", Bool: &noEnv}},
 		Run: func(ctx context.Context, args []string) error {
-			a.EnvFile = envFile
+			a.NoEnv = noEnv
 
 			pkg, err := a.FindPkg(pkgArg(args))
 			if err != nil {
@@ -46,13 +46,13 @@ func cmdRun(a *App) Command {
 }
 
 func cmdWatch(a *App) Command {
-	var envFile string
+	var noEnv bool
 
 	return Command{
 		Name: "watch", Usage: "Rebuild & restart on .go file changes", Args: "[pkg]",
-		Flags: []Flag{{Name: "env", Short: "e", Usage: "Load env file", Value: &envFile}},
+		Flags: []Flag{{Name: "no-env", Usage: "Skip loading .env file", Bool: &noEnv}},
 		Run: func(ctx context.Context, args []string) error {
-			a.EnvFile = envFile
+			a.NoEnv = noEnv
 
 			pkg, err := a.FindPkg(pkgArg(args))
 			if err != nil {
@@ -126,6 +126,7 @@ func cmdLogs(a *App) Command {
 		Run: func(ctx context.Context, args []string) error {
 			return RunLogView(LogViewOptions{
 				LogPath:         a.LogFile(),
+				Logs:            a.Cfg.Logs,
 				HighlightFields: a.Cfg.Logs.HighlightFields,
 			})
 		},
@@ -140,6 +141,7 @@ func (a *App) runAppLogView(title string, pid int, exitCh <-chan error, onExit f
 		OnExit:          onExit,
 		OnStop:          func() { _ = a.Stop() },
 		Title:           title,
+		Logs:            a.Cfg.Logs,
 		HighlightFields: a.Cfg.Logs.HighlightFields,
 	})
 }
@@ -245,6 +247,7 @@ func cmdAttach(a *App) Command {
 				PID:             pid,
 				OnStop:          func() { _ = a.Stop() },
 				Title:           "ATTACH",
+				Logs:            a.Cfg.Logs,
 				HighlightFields: a.Cfg.Logs.HighlightFields,
 			})
 			if err != nil {

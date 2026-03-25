@@ -26,6 +26,7 @@ type ConfigBuild struct {
 
 type ConfigRun struct {
 	EnvFile string `yaml:"env_file"`
+	NoEnv   bool   `yaml:"no_env"`
 }
 
 type ConfigWatch struct {
@@ -40,7 +41,17 @@ type ConfigTest struct {
 }
 
 type ConfigLogs struct {
-	HighlightFields []string `yaml:"highlight_fields"`
+	Format          string          `yaml:"format"`
+	LevelField      string          `yaml:"level_field"`
+	LevelValues     ConfigLogLevels `yaml:"level_values"`
+	HighlightFields []string        `yaml:"highlight_fields"`
+}
+
+type ConfigLogLevels struct {
+	Error []string `yaml:"error"`
+	Warn  []string `yaml:"warn"`
+	Info  []string `yaml:"info"`
+	Debug []string `yaml:"debug"`
 }
 
 func DefaultConfig() Config {
@@ -48,6 +59,9 @@ func DefaultConfig() Config {
 		Build: ConfigBuild{
 			CmdPattern: "cmd/*/main.go",
 			Flags:      []string{"-race"},
+		},
+		Run: ConfigRun{
+			EnvFile: ".env",
 		},
 		Watch: ConfigWatch{
 			Dirs:       []string{"."},
@@ -59,6 +73,14 @@ func DefaultConfig() Config {
 			CoverProfile: "coverage.out",
 		},
 		Logs: ConfigLogs{
+			Format:     "auto",
+			LevelField: "level",
+			LevelValues: ConfigLogLevels{
+				Error: []string{"error", "err", "fatal"},
+				Warn:  []string{"warn", "warning"},
+				Info:  []string{"info"},
+				Debug: []string{"debug", "trace"},
+			},
 			HighlightFields: []string{"msg"},
 		},
 	}

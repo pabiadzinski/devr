@@ -2,6 +2,7 @@ package devr
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -46,6 +47,7 @@ type logViewModel struct {
 	title           string
 	wrap            bool
 	highlightFields []string
+	parser          logParser
 }
 
 var (
@@ -66,7 +68,9 @@ var (
 func newModel() logViewModel {
 	return logViewModel{
 		follow: true,
+		wrap:   true,
 		done:   make(chan struct{}),
+		parser: newLogParser(DefaultConfig().Logs),
 	}
 }
 
@@ -91,21 +95,155 @@ const (
 	levelUnknown
 )
 
-func parseLine(line string) logEntry {
-	e := logEntry{raw: line, lower: strings.ToLower(line), level: levelUnknown}
+type logParser struct {
+	format     string
+	levelField string
+	levelMap   map[string]level
+}
 
-	switch {
-	case strings.Contains(e.lower, `"level":"error"`) || strings.Contains(e.lower, " error "):
-		e.level = levelError
-	case strings.Contains(e.lower, `"level":"warn"`) || strings.Contains(e.lower, `"level":"warning"`) || strings.Contains(e.lower, " warn "):
-		e.level = levelWarn
-	case strings.Contains(e.lower, `"level":"info"`) || strings.Contains(e.lower, " info "):
-		e.level = levelInfo
-	case strings.Contains(e.lower, `"level":"debug"`) || strings.Contains(e.lower, " debug "):
-		e.level = levelDebug
+func parseLine(line string) logEntry {
+	return newLogParser(DefaultConfig().Logs).Parse(line)
+}
+
+func newLogParser(cfg ConfigLogs) logParser {
+	defaults := DefaultConfig().Logs
+	if cfg.Format == "" {
+		cfg.Format = defaults.Format
 	}
 
-	return e
+	if cfg.LevelField == "" {
+		cfg.LevelField = defaults.LevelField
+	}
+
+	if len(cfg.LevelValues.Error) == 0 {
+		cfg.LevelValues.Error = defaults.LevelValues.Error
+	}
+
+	if len(cfg.LevelValues.Warn) == 0 {
+		cfg.LevelValues.Warn = defaults.LevelValues.Warn
+	}
+
+	if len(cfg.LevelValues.Info) == 0 {
+		cfg.LevelValues.Info = defaults.LevelValues.Info
+	}
+
+	if len(cfg.LevelValues.Debug) == 0 {
+		cfg.LevelValues.Debug = defaults.LevelValues.Debug
+	}
+
+	parser := logParser{
+		format:     cfg.Format,
+		levelField: cfg.LevelField,
+		levelMap:   make(map[string]level),
+	}
+
+	addLevelAliases(parser.levelMap, levelError, cfg.LevelValues.Error)
+	addLevelAliases(parser.levelMap, levelWarn, cfg.LevelValues.Warn)
+	addLevelAliases(parser.levelMap, levelInfo, cfg.LevelValues.Info)
+	addLevelAliases(parser.levelMap, levelDebug, cfg.LevelValues.Debug)
+
+	return parser
+}
+
+func addLevelAliases(dst map[string]level, target level, aliases []string) {
+	for _, alias := range aliases {
+		dst[strings.ToLower(alias)] = target
+	}
+}
+
+func (p logParser) Parse(line string) logEntry {
+	entry := logEntry{raw: line, lower: strings.ToLower(line), level: levelUnknown}
+
+	switch p.format {
+	case "json":
+		return p.parseJSON(entry)
+	case "text":
+		return p.parseText(entry)
+	default:
+		if parsed, ok := p.parseJSONIfPossible(entry); ok {
+			return parsed
+		}
+
+		return p.parseText(entry)
+	}
+}
+
+func (p logParser) parseJSONIfPossible(entry logEntry) (logEntry, bool) {
+	parsed, err := p.parseJSONObject(entry.raw)
+	if err != nil {
+		return entry, false
+	}
+
+	entry.level = p.lookupLevel(parsed[p.levelField])
+
+	return entry, true
+}
+
+func (p logParser) parseJSON(entry logEntry) logEntry {
+	parsed, err := p.parseJSONObject(entry.raw)
+	if err != nil {
+		return p.parseText(entry)
+	}
+
+	entry.level = p.lookupLevel(parsed[p.levelField])
+
+	return entry
+}
+
+func (p logParser) parseText(entry logEntry) logEntry {
+	if value, ok := extractKeyValue(entry.raw, p.levelField); ok {
+		entry.level = p.lookupLevel(value)
+		if entry.level != levelUnknown {
+			return entry
+		}
+	}
+
+	for _, field := range strings.Fields(entry.lower) {
+		token := strings.Trim(field, `"'[](){}:;,`)
+		if level := p.lookupLevel(token); level != levelUnknown {
+			entry.level = level
+			return entry
+		}
+	}
+
+	return entry
+}
+
+func (p logParser) parseJSONObject(line string) (map[string]any, error) {
+	var obj map[string]any
+	if err := json.Unmarshal([]byte(line), &obj); err != nil {
+		return nil, err
+	}
+
+	return obj, nil
+}
+
+func (p logParser) lookupLevel(v any) level {
+	if v == nil {
+		return levelUnknown
+	}
+
+	key := strings.ToLower(strings.TrimSpace(fmt.Sprint(v)))
+	if level, ok := p.levelMap[key]; ok {
+		return level
+	}
+
+	return levelUnknown
+}
+
+func extractKeyValue(line, key string) (string, bool) {
+	prefix := key + "="
+	for _, part := range strings.Fields(line) {
+		if !strings.HasPrefix(part, prefix) {
+			continue
+		}
+
+		value := strings.TrimPrefix(part, prefix)
+
+		return strings.Trim(value, `"'`), true
+	}
+
+	return "", false
 }
 
 var levelKeywords = []string{
