@@ -27,7 +27,7 @@ func (m logViewModel) View() string {
 
 	for i := m.offset; i < len(m.filtered) && usedLines < viewH; i++ {
 		idx := m.filtered[i]
-		line := m.lines[idx].render(i == m.cursor, m.filter, m.filterLower, m.width, m.highlightFields)
+		line := m.lines[idx].render(i == m.cursor, m.filter, m.filterLower, m.search, m.searchLower, m.width, m.highlightFields)
 
 		if m.wrap && m.width > 0 {
 			line = ansi.Hardwrap(line, m.width, true)
@@ -71,8 +71,13 @@ func (m logViewModel) View() string {
 }
 
 func (m logViewModel) headerText() string {
-	return styleDim.Render(fmt.Sprintf(" %d lines | filter: %s | ?=help",
-		len(m.filtered), filterLabel(m.filter)))
+	searchPart := ""
+	if m.search != "" {
+		searchPart = " | search: " + m.search
+	}
+
+	return styleDim.Render(fmt.Sprintf(" %d lines | filter: %s%s | ?=help",
+		len(m.filtered), filterLabel(m.filter), searchPart))
 }
 
 func (m logViewModel) footerText() string {
@@ -82,6 +87,9 @@ func (m logViewModel) footerText() string {
 	case m.mode == modeSearch:
 		cursor := styleSearch.Render("▏")
 		return styleSearch.Render(" /") + m.searchBuf + cursor
+	case m.mode == modeHighlightSearch:
+		cursor := styleSearch.Render("▏")
+		return styleSearch.Render(" s/") + m.searchBuf + cursor
 	default:
 		return m.statusFooter()
 	}
@@ -103,7 +111,12 @@ func (m logViewModel) statusFooter() string {
 		wrapIndicator = styleFollow.Render(" WRAP")
 	}
 
-	return titlePart + styleDim.Render(fmt.Sprintf("%d/%d", m.cursor+1, len(m.filtered))) + followIndicator + wrapIndicator + " "
+	searchIndicator := ""
+	if m.search != "" {
+		searchIndicator = styleSearchHL.Render(" SEARCH")
+	}
+
+	return titlePart + styleDim.Render(fmt.Sprintf("%d/%d", m.cursor+1, len(m.filtered))) + followIndicator + wrapIndicator + searchIndicator + " "
 }
 
 func (m logViewModel) renderHelp() string {
@@ -118,7 +131,9 @@ func (m logViewModel) renderHelp() string {
 		{"H", "Top of screen"},
 		{"M", "Middle of screen"},
 		{"L", "Bottom of screen"},
-		{"/ + text", "Search / filter"},
+		{"/ + text", "Filter lines"},
+		{"s + text", "Search (highlight only)"},
+		{"n / N", "Next / prev search match"},
 		{"Esc", "Cancel search"},
 		{"Ctrl+U (search)", "Clear search"},
 		{"1-4", "Filter by level (error/warn/info/debug)"},
@@ -128,7 +143,7 @@ func (m logViewModel) renderHelp() string {
 		{"Tab", "Toggle JSON preview"},
 		{"Enter", "Insert blank line"},
 		{"y", "Copy line to clipboard"},
-		{"q, Esc", "Detach (process keeps running)"},
+		{"q", "Detach (process keeps running)"},
 		{"Ctrl+C ×2", "Stop process and exit"},
 	}
 
@@ -176,7 +191,7 @@ func (m *logViewModel) countVisualLines(filteredIdx int) int {
 	}
 
 	idx := m.filtered[filteredIdx]
-	line := m.lines[idx].render(false, m.filter, m.filterLower, m.width, m.highlightFields)
+	line := m.lines[idx].render(false, m.filter, m.filterLower, m.search, m.searchLower, m.width, m.highlightFields)
 
 	if m.wrap && m.width > 0 {
 		wrapped := ansi.Hardwrap(line, m.width, true)

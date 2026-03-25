@@ -45,8 +45,8 @@ func (m logViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		if m.mode == modeSearch {
-			return m.updateSearch(msg)
+		if m.mode == modeSearch || m.mode == modeHighlightSearch {
+			return m.updateSearchInput(msg)
 		}
 
 		return m.updateNormal(msg)
@@ -57,7 +57,7 @@ func (m logViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m logViewModel) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "q", "esc":
+	case "q":
 		m.exit = exitDetach
 		return m, tea.Quit
 	case "up", "k":
@@ -126,6 +126,13 @@ func (m logViewModel) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		m.mode = modeSearch
 		m.searchBuf = m.filter
+	case "s":
+		m.mode = modeHighlightSearch
+		m.searchBuf = m.search
+	case "n":
+		m.jumpToMatch(1)
+	case "N":
+		m.jumpToMatch(-1)
 	case "1":
 		m.setFilter("error")
 	case "2":
@@ -149,28 +156,57 @@ func (m logViewModel) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m logViewModel) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m logViewModel) updateSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	isFilter := m.mode == modeSearch
+
 	switch msg.String() {
 	case "enter":
 		m.mode = modeNormal
-		m.setFilter(m.searchBuf)
+		if isFilter {
+			m.setFilter(m.searchBuf)
+		} else {
+			m.setSearch(m.searchBuf)
+		}
 	case "esc":
 		m.mode = modeNormal
-		m.searchBuf = m.filter
+		if isFilter {
+			m.searchBuf = m.filter
+		} else {
+			m.searchBuf = m.search
+		}
 	case "backspace":
 		if len(m.searchBuf) > 0 {
 			runes := []rune(m.searchBuf)
 			m.searchBuf = string(runes[:len(runes)-1])
 		}
 
-		m.setFilter(m.searchBuf)
+		if isFilter {
+			m.setFilter(m.searchBuf)
+		} else {
+			m.setSearch(m.searchBuf)
+		}
 	case "ctrl+u":
 		m.searchBuf = ""
-		m.setFilter("")
+		if isFilter {
+			m.setFilter("")
+		} else {
+			m.setSearch("")
+		}
+	case " ":
+		m.searchBuf += " "
+		if isFilter {
+			m.setFilter(m.searchBuf)
+		} else {
+			m.setSearch(m.searchBuf)
+		}
 	default:
 		if msg.Type == tea.KeyRunes {
 			m.searchBuf += string(msg.Runes)
-			m.setFilter(m.searchBuf)
+			if isFilter {
+				m.setFilter(m.searchBuf)
+			} else {
+				m.setSearch(m.searchBuf)
+			}
 		}
 	}
 
@@ -256,6 +292,27 @@ func (m *logViewModel) refilter() {
 	for i, e := range m.lines {
 		if m.matchFilter(e) {
 			m.filtered = append(m.filtered, i)
+		}
+	}
+}
+
+func (m *logViewModel) setSearch(s string) {
+	m.search = s
+	m.searchLower = strings.ToLower(s)
+}
+
+func (m *logViewModel) jumpToMatch(dir int) {
+	if m.search == "" {
+		return
+	}
+
+	for i := m.cursor + dir; i >= 0 && i < len(m.filtered); i += dir {
+		idx := m.filtered[i]
+		if strings.Contains(m.lines[idx].lower, m.searchLower) {
+			m.cursor = i
+			m.follow = false
+			m.ensureVisible()
+			return
 		}
 	}
 }

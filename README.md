@@ -81,11 +81,17 @@ The built-in log viewer gives you a full-screen TUI with real-time tailing:
 | `j/k`, `arrows` | Navigate |
 | `Ctrl+D/U` | Half page scroll |
 | `Ctrl+F/B` | Full page scroll |
+| `H/M/L` | Top / middle / bottom of screen |
 | `g` / `G` | Jump to top / bottom |
-| `/` | Search & filter |
+| `/` | Filter lines (search + hide non-matching) |
+| `s` | Search with highlight (no filtering) |
+| `n` / `N` | Next / prev search match |
 | `1` `2` `3` `4` | Filter: error, warn, info, debug |
-| `0` | Show all |
+| `0` | Clear filter |
+| `w` | Toggle line wrap (on by default) |
+| `Alt+Enter` | Insert marker line |
 | `Tab` | JSON pretty-print panel |
+| `Enter` | Insert blank line |
 | `y` | Copy line to clipboard |
 | `q` | Detach (process keeps running) |
 | `Ctrl+C` x2 | Stop process & exit |

@@ -18,6 +18,7 @@ type logViewMode int
 const (
 	modeNormal logViewMode = iota
 	modeSearch
+	modeHighlightSearch
 	modeHelp
 )
 
@@ -46,23 +47,26 @@ type logViewModel struct {
 	done            chan struct{}
 	title           string
 	wrap            bool
+	search          string
+	searchLower     string
 	highlightFields []string
 	parser          logParser
 }
 
 var (
-	styleError   = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
-	styleWarn    = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
-	styleInfo    = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
-	styleDebug   = lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
-	styleTime    = lipgloss.NewStyle().Foreground(lipgloss.Color("14"))
-	styleDim     = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
-	styleMatch   = lipgloss.NewStyle().Background(lipgloss.Color("11")).Foreground(lipgloss.Color("0"))
-	styleCtrlC   = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
-	styleHelpKey = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true)
-	styleSearch  = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
-	styleFollow  = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
-	styleMsg     = lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
+	styleError    = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
+	styleWarn     = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
+	styleInfo     = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
+	styleDebug    = lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
+	styleTime     = lipgloss.NewStyle().Foreground(lipgloss.Color("14"))
+	styleDim      = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	styleMatch    = lipgloss.NewStyle().Background(lipgloss.Color("11")).Foreground(lipgloss.Color("0"))
+	styleCtrlC    = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
+	styleHelpKey  = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true)
+	styleSearch   = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
+	styleFollow   = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
+	styleSearchHL = lipgloss.NewStyle().Background(lipgloss.Color("5")).Foreground(lipgloss.Color("15"))
+	styleMsg      = lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
 )
 
 func newModel() logViewModel {
@@ -260,7 +264,7 @@ var levelStyles = map[string]lipgloss.Style{
 	"DEBUG": styleDebug, "debug": styleDebug,
 }
 
-func (e logEntry) render(selected bool, search, searchLower string, width int, highlightFields []string) string {
+func (e logEntry) render(selected bool, filter, filterLower, search, searchLower string, width int, highlightFields []string) string {
 	if e.isMarker {
 		markerWidth := width - 5 // account for padding and cursor
 		if markerWidth < 10 {
@@ -296,8 +300,12 @@ func (e logEntry) render(selected bool, search, searchLower string, width int, h
 		line = highlightJSONField(line, field)
 	}
 
+	if filter != "" {
+		line = highlightAll(line, filter, filterLower, styleMatch)
+	}
+
 	if search != "" {
-		line = highlightAll(line, search, searchLower)
+		line = highlightAll(line, search, searchLower, styleSearchHL)
 	}
 
 	return line
@@ -332,7 +340,7 @@ func highlightJSONField(line, field string) string {
 	return highlighted
 }
 
-func highlightAll(line, search, searchLower string) string {
+func highlightAll(line, search, searchLower string, style lipgloss.Style) string {
 	lower := strings.ToLower(line)
 
 	var b strings.Builder
@@ -347,7 +355,7 @@ func highlightAll(line, search, searchLower string) string {
 		}
 
 		b.WriteString(line[pos : pos+idx])
-		b.WriteString(styleMatch.Render(line[pos+idx : pos+idx+len(search)]))
+		b.WriteString(style.Render(line[pos+idx : pos+idx+len(search)]))
 		pos += idx + len(search)
 	}
 
