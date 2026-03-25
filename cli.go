@@ -74,10 +74,7 @@ func (cli *CLI) Run(args []string) error {
 
 func parseFlags(flags []Flag, args []string) []string {
 	fs := newFlagSet(flags)
-
-	if err := fs.Parse(args); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-	}
+	_ = fs.Parse(args)
 
 	return fs.Args()
 }

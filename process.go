@@ -35,8 +35,20 @@ func (a *App) FindPkg(pkg string) (string, error) {
 	return "", fmt.Errorf("could not find main.go, specify package path")
 }
 
+func (a *App) BuildFlagsLabel() string {
+	if len(a.Cfg.Build.Flags) == 0 {
+		return ""
+	}
+
+	return strings.Join(a.Cfg.Build.Flags, " ")
+}
+
 func (a *App) Build(pkg string) error {
-	Info("Building %s...", pkg)
+	if label := a.BuildFlagsLabel(); label != "" {
+		Info("Building %s [%s]...", pkg, label)
+	} else {
+		Info("Building %s...", pkg)
+	}
 
 	args := make([]string, 0, 2+len(a.Cfg.Build.Flags)+3)
 	args = append(args, "build")

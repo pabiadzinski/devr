@@ -55,6 +55,8 @@ devr app logs             # view logs from last run
 devr app ps               # list all managed processes
 ```
 
+Build flags (e.g. `-race`) are applied from `build.flags` in `.devr.yaml` and shown in the log viewer title.
+
 ### Test
 
 ```bash
@@ -65,6 +67,8 @@ devr test run -r TestFoo  # run specific tests
 devr test bench           # run benchmarks
 devr test cover           # coverage report, opens in browser
 ```
+
+Tests and benchmarks also use `build.flags` from `.devr.yaml` (e.g. `-race` by default).
 
 ### Scaffold
 

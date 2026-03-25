@@ -23,7 +23,7 @@ func cmdRun(a *App) Command {
 	var noEnv bool
 
 	return Command{
-		Name: "run", Usage: "Build & run Go app with log viewer", Args: "[pkg]",
+		Name: "run", Usage: "Build & run Go app with log viewer (build flags from .devr.yaml)", Args: "[pkg]",
 		Flags: []Flag{{Name: "no-env", Usage: "Skip loading .env file", Bool: &noEnv}},
 		Run: func(ctx context.Context, args []string) error {
 			a.NoEnv = noEnv
@@ -49,7 +49,7 @@ func cmdWatch(a *App) Command {
 	var noEnv bool
 
 	return Command{
-		Name: "watch", Usage: "Rebuild & restart on .go file changes", Args: "[pkg]",
+		Name: "watch", Usage: "Rebuild & restart on .go file changes (build flags from .devr.yaml)", Args: "[pkg]",
 		Flags: []Flag{{Name: "no-env", Usage: "Skip loading .env file", Bool: &noEnv}},
 		Run: func(ctx context.Context, args []string) error {
 			a.NoEnv = noEnv
@@ -133,6 +133,14 @@ func cmdLogs(a *App) Command {
 	}
 }
 
+func (a *App) logViewTitle(title string) string {
+	if label := a.BuildFlagsLabel(); label != "" {
+		return title + " [" + label + "]"
+	}
+
+	return title
+}
+
 func (a *App) runAppLogView(title string, pid int, exitCh <-chan error, onExit func()) error {
 	return RunLogView(LogViewOptions{
 		LogPath:         a.LogFile(),
@@ -140,7 +148,7 @@ func (a *App) runAppLogView(title string, pid int, exitCh <-chan error, onExit f
 		ExitCh:          exitCh,
 		OnExit:          onExit,
 		OnStop:          func() { _ = a.Stop() },
-		Title:           title,
+		Title:           a.logViewTitle(title),
 		Logs:            a.Cfg.Logs,
 		HighlightFields: a.Cfg.Logs.HighlightFields,
 	})

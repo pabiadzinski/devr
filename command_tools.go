@@ -9,11 +9,11 @@ import (
 func cmdTest(a *App) Command {
 	return Command{
 		Name: "test", Usage: "Run tests and benchmarks",
-		Sub: []Command{cmdTestRun(), cmdBench(), cmdCover(a)},
+		Sub: []Command{cmdTestRun(a), cmdBench(a), cmdCover(a)},
 	}
 }
 
-func cmdTestRun() Command {
+func cmdTestRun(a *App) Command {
 	var (
 		format  string
 		short   bool
@@ -22,7 +22,7 @@ func cmdTestRun() Command {
 	)
 
 	return Command{
-		Name: "run", Usage: "Run tests", Args: "[pkg]",
+		Name: "run", Usage: "Run tests (build flags from .devr.yaml)", Args: "[pkg]",
 		Flags: []Flag{
 			{Name: "format", Short: "f", Usage: "Output: dots, short, testname, verbose", Default: fmtTestname, Value: &format},
 			{Name: "short", Short: "s", Usage: "Short mode", Bool: &short},
@@ -36,6 +36,8 @@ func cmdTestRun() Command {
 			}
 
 			goArgs := []string{"test", "-json", "-count=1"}
+			goArgs = append(goArgs, a.Cfg.Build.Flags...)
+
 			if format == fmtVerbose {
 				goArgs = append(goArgs, "-v")
 			}
@@ -75,7 +77,7 @@ func cmdTestRun() Command {
 	}
 }
 
-func cmdBench() Command {
+func cmdBench(a *App) Command {
 	return Command{
 		Name: "bench", Usage: "Run benchmarks", Args: "[pkg]",
 		Run: func(ctx context.Context, args []string) error {
@@ -84,7 +86,11 @@ func cmdBench() Command {
 				pkg = "./..."
 			}
 
-			cmd := exec.Command("go", "test", "-bench=.", "-benchmem", "-run=^$", pkg)
+			goArgs := []string{"test", "-bench=.", "-benchmem", "-run=^$"}
+			goArgs = append(goArgs, a.Cfg.Build.Flags...)
+			goArgs = append(goArgs, pkg)
+
+			cmd := exec.Command("go", goArgs...)
 
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
