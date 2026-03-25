@@ -64,9 +64,9 @@ func RunLogView(opts LogViewOptions) error {
 
 	finalModel, err := p.Run()
 
-	close(m.done)
-
 	if live {
+		close(m.done)
+
 		_ = f.Close()
 	}
 

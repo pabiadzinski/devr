@@ -46,9 +46,9 @@ That's it. Your app is running and you're in the log viewer.
 
 ```bash
 devr app run              # build, start, open log viewer
-devr app run --env .env   # same, but load .env file
+devr app run --no-env     # skip loading .env file
 devr app watch            # same, but auto-restart on .go changes
-devr app watch -e .env    # watch with env file
+devr app watch --no-env   # watch without env file
 devr app stop             # send SIGTERM to the background process
 devr app attach           # reattach to a running process
 devr app logs             # view logs from last run
@@ -114,7 +114,7 @@ build:
   flags: ["-race"]
 
 run:
-  env_file: ".env"       # or .env.local, etc. (empty by default)
+  env_file: ".env"       # or .env.local, etc. (defaults to .env)
 
 watch:
   extensions: [".go"]

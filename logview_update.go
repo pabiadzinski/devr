@@ -312,6 +312,7 @@ func (m *logViewModel) jumpToMatch(dir int) {
 			m.cursor = i
 			m.follow = false
 			m.ensureVisible()
+
 			return
 		}
 	}

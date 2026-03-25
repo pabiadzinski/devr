@@ -6,6 +6,10 @@ import (
 	"strings"
 )
 
+func zshEscape(s string) string {
+	return strings.ReplaceAll(s, "'", "'\\''")
+}
+
 func (a *CLI) cmdCompletion() Command {
 	return Command{
 		Name: "completion", Usage: "Generate shell completions", Args: "<fish|bash|zsh>",
@@ -161,7 +165,7 @@ func (a *CLI) completionZsh() string {
 	fmt.Fprintf(&b, "  commands=(\n")
 
 	for _, cmd := range a.commands {
-		fmt.Fprintf(&b, "    '%s:%s'\n", cmd.Name, cmd.Usage)
+		fmt.Fprintf(&b, "    '%s:%s'\n", cmd.Name, zshEscape(cmd.Usage))
 	}
 
 	fmt.Fprintf(&b, "    'help:Show help'\n")
@@ -185,7 +189,7 @@ func (a *CLI) completionZsh() string {
 		fmt.Fprintf(&b, "      subcmds=(\n")
 
 		for _, sc := range cmd.Sub {
-			fmt.Fprintf(&b, "        '%s:%s'\n", sc.Name, sc.Usage)
+			fmt.Fprintf(&b, "        '%s:%s'\n", sc.Name, zshEscape(sc.Usage))
 		}
 
 		fmt.Fprintf(&b, "      )\n")

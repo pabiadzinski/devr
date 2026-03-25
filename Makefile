@@ -3,7 +3,7 @@ PKG := ./cmd/$(APP)
 VERSION ?= dev
 LDFLAGS := -ldflags "-X main.version=$(VERSION)"
 
-.PHONY: run build install snapshot
+.PHONY: run build install snapshot lint test
 
 run:
 	go run $(PKG) $(ARGS)
@@ -13,6 +13,12 @@ build:
 
 install:
 	go install $(LDFLAGS) $(PKG)
+
+test:
+	go run $(PKG) test run
+
+lint:
+	golangci-lint run
 
 snapshot:
 	goreleaser release --snapshot --clean
