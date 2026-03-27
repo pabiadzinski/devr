@@ -10,6 +10,7 @@ import (
 )
 
 type lineMsg string
+type titleMsg string
 type clearWarningMsg struct{}
 type processExitMsg struct{}
 

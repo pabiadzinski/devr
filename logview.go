@@ -3,6 +3,7 @@ package devr
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -14,7 +15,7 @@ type LogViewOptions struct {
 	LogPath         string
 	PID             int
 	OnStop          func()
-	OnExit          func()
+	OnReady         func(send func(tea.Msg))
 	Title           string
 	Logs            ConfigLogs
 	HighlightFields []string
@@ -43,6 +44,12 @@ func RunLogView(opts LogViewOptions) error {
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	if live {
+		logOut = io.Discard
+
+		if opts.OnReady != nil {
+			opts.OnReady(p.Send)
+		}
+
 		go tailFile(f, p, m.done)
 	} else {
 		_ = f.Close()
@@ -52,10 +59,6 @@ func RunLogView(opts LogViewOptions) error {
 		go func() {
 			select {
 			case <-opts.ExitCh:
-				if opts.OnExit != nil {
-					opts.OnExit()
-				}
-
 				p.Send(processExitMsg{})
 			case <-m.done:
 			}
@@ -68,6 +71,8 @@ func RunLogView(opts LogViewOptions) error {
 		close(m.done)
 
 		_ = f.Close()
+
+		logOut = os.Stderr
 	}
 
 	if fm, ok := finalModel.(logViewModel); ok && fm.exit == exitStop && opts.OnStop != nil {
@@ -105,7 +110,13 @@ func tailFile(f *os.File, p *tea.Program, done chan struct{}) {
 
 		line, err := reader.ReadString('\n')
 		if err != nil {
+			if detectTruncate(f) {
+				_, _ = f.Seek(0, 0)
+				reader.Reset(f)
+			}
+
 			time.Sleep(100 * time.Millisecond)
+
 			continue
 		}
 
@@ -114,4 +125,18 @@ func tailFile(f *os.File, p *tea.Program, done chan struct{}) {
 			p.Send(lineMsg(line))
 		}
 	}
+}
+
+func detectTruncate(f *os.File) bool {
+	pos, err := f.Seek(0, 1)
+	if err != nil {
+		return false
+	}
+
+	info, err := f.Stat()
+	if err != nil {
+		return false
+	}
+
+	return pos > info.Size()
 }

@@ -29,6 +29,10 @@ func (m logViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.markCrashed()
 		return m, nil
 
+	case titleMsg:
+		m.title = string(msg)
+		return m, nil
+
 	case lineMsg:
 		m.appendLine(m.parser.Parse(string(msg)))
 		return m, nil

@@ -2,6 +2,7 @@ package devr
 
 import (
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -14,24 +15,27 @@ const (
 	bold   = "\033[1m"
 )
 
+var (
+	LogDebug bool
+	logOut   io.Writer = os.Stderr
+)
+
 func Info(msg string, args ...any) {
-	fmt.Fprintf(os.Stderr, green+"INFO"+reset+"  "+msg+"\n", args...)
+	_, _ = fmt.Fprintf(logOut, green+"INFO"+reset+"  "+msg+"\n", args...)
 }
 
 func Warn(msg string, args ...any) {
-	fmt.Fprintf(os.Stderr, yellow+"WARN"+reset+"  "+msg+"\n", args...)
+	_, _ = fmt.Fprintf(logOut, yellow+"WARN"+reset+"  "+msg+"\n", args...)
 }
 
 func Error(msg string, args ...any) {
-	fmt.Fprintf(os.Stderr, red+"ERROR"+reset+" "+msg+"\n", args...)
+	_, _ = fmt.Fprintf(logOut, red+"ERROR"+reset+" "+msg+"\n", args...)
 }
-
-var LogDebug bool
 
 func Dbg(msg string, args ...any) {
 	if !LogDebug {
 		return
 	}
 
-	fmt.Fprintf(os.Stderr, dim+"DEBUG"+reset+" "+msg+"\n", args...)
+	_, _ = fmt.Fprintf(logOut, dim+"DEBUG"+reset+" "+msg+"\n", args...)
 }

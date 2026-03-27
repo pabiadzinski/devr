@@ -58,4 +58,4 @@ Sleep 1s
 # Run tests
 Type "devr test run"
 Enter
-Sleep 8s
+Sleep 5s

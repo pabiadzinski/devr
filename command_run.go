@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func cmdApp(a *App) Command {
@@ -37,7 +39,7 @@ func cmdRun(a *App) Command {
 				return err
 			}
 
-			return a.runAppLogView("RUN", pid, exitCh, nil)
+			return RunLogView(a.newLogViewOptions("RUN", pid, exitCh))
 		},
 	}
 }
@@ -70,9 +72,9 @@ func cmdWatch(a *App) Command {
 
 			supervisor := a.newWatchSupervisor(ctx, pkg)
 
-			pid, exitCh, err := supervisor.start()
+			pid, _, err := supervisor.start()
 			if err != nil {
-				supervisor.reportBuildFailure(err)
+				a.reportBuildFailure(err)
 			}
 
 			Info("Watching for .go changes... (Ctrl+C to stop)")
@@ -82,7 +84,12 @@ func cmdWatch(a *App) Command {
 			}()
 
 			if pid > 0 {
-				return a.runAppLogView("WATCH", pid, exitCh, supervisor.notifyIfCrash)
+				opts := a.newLogViewOptions("WATCH", pid, nil)
+				opts.OnReady = func(send func(tea.Msg)) {
+					supervisor.send = send
+				}
+
+				return RunLogView(opts)
 			}
 
 			<-ctx.Done()
@@ -148,17 +155,16 @@ func (a *App) logViewTitle(title string) string {
 	return title
 }
 
-func (a *App) runAppLogView(title string, pid int, exitCh <-chan error, onExit func()) error {
-	return RunLogView(LogViewOptions{
+func (a *App) newLogViewOptions(title string, pid int, exitCh <-chan error) LogViewOptions {
+	return LogViewOptions{
 		LogPath:         a.LogFile(),
 		PID:             pid,
 		ExitCh:          exitCh,
-		OnExit:          onExit,
 		OnStop:          func() { _ = a.Stop() },
 		Title:           a.logViewTitle(title),
 		Logs:            a.Cfg.Logs,
 		HighlightFields: a.Cfg.Logs.HighlightFields,
-	})
+	}
 }
 
 func (a *App) reportBuildFailure(err error) {
@@ -174,6 +180,7 @@ type watchSupervisor struct {
 	ctx       context.Context
 	pkg       string
 	cancelMon context.CancelFunc
+	send      func(tea.Msg)
 }
 
 func (a *App) newWatchSupervisor(ctx context.Context, pkg string) *watchSupervisor {
@@ -195,15 +202,22 @@ func (w *watchSupervisor) start() (int, <-chan error, error) {
 	return pid, exitCh, nil
 }
 
+func (w *watchSupervisor) setTitle(title string) {
+	if w.send != nil {
+		w.send(titleMsg(title))
+	}
+}
+
 func (w *watchSupervisor) rebuild() {
-	Info("Rebuilding...")
+	w.setTitle("REBUILDING...")
 	w.stopMonitoring()
 	w.app.Kill()
 
 	if _, exitCh, err := w.app.BuildAndStart(w.pkg); err != nil {
-		w.reportBuildFailure(err)
-		Info("Waiting for changes...")
+		w.app.reportBuildFailure(err)
+		w.setTitle("BUILD FAILED")
 	} else {
+		w.setTitle(w.app.logViewTitle("WATCH"))
 		w.monitorExit(exitCh)
 	}
 }
@@ -219,13 +233,11 @@ func (w *watchSupervisor) monitorExit(exitCh <-chan error) {
 		case <-monCtx.Done():
 		case <-exitCh:
 			if !w.app.killing.Load() {
-				Error("Process crashed")
+				w.setTitle("CRASHED")
 
 				if w.app.Cfg.Notify {
 					Notify(w.app.Name, "Process crashed")
 				}
-
-				Info("Waiting for changes...")
 			}
 		}
 	}()
@@ -236,16 +248,6 @@ func (w *watchSupervisor) stopMonitoring() {
 		w.cancelMon()
 		w.cancelMon = nil
 	}
-}
-
-func (w *watchSupervisor) notifyIfCrash() {
-	if !w.app.killing.Load() && w.app.Cfg.Notify {
-		Notify(w.app.Name, "Process crashed")
-	}
-}
-
-func (w *watchSupervisor) reportBuildFailure(err error) {
-	w.app.reportBuildFailure(err)
 }
 
 func cmdAttach(a *App) Command {

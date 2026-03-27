@@ -8,17 +8,22 @@ import (
 	"time"
 )
 
-func log(level, msg string, fields map[string]any) {
+func log(level, msg string, fields map[string]any) string {
 	entry := map[string]any{
 		"time":  time.Now().Format("15:04:05.000"),
 		"level": level,
 		"msg":   msg,
 	}
+
 	for k, v := range fields {
 		entry[k] = v
 	}
+
 	data, _ := json.Marshal(entry)
-	fmt.Fprintln(os.Stdout, string(data))
+	line := string(data)
+	fmt.Fprintln(os.Stdout, line)
+
+	return line
 }
 
 func main() {

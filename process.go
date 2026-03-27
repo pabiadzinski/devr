@@ -1,6 +1,7 @@
 package devr
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -49,10 +50,16 @@ func (a *App) Build(pkg string) error {
 	args = append(args, "-o", a.BinFile(), pkg)
 	cmd := exec.Command("go", args...)
 	cmd.Dir = a.WorkDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
 
-	return cmd.Run()
+	var stderr bytes.Buffer
+
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s", strings.TrimSpace(stderr.String()))
+	}
+
+	return nil
 }
 
 func (a *App) Start() (int, <-chan error, error) {
