@@ -4,6 +4,11 @@
     <strong>A zero-config dev runner for Go projects</strong>
   </p>
   <p align="center">
+    <a href="https://github.com/pabiadzinski/devr/actions/workflows/ci.yml"><img src="https://github.com/pabiadzinski/devr/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+    <a href="https://codecov.io/gh/pabiadzinski/devr"><img src="https://codecov.io/gh/pabiadzinski/devr/branch/main/graph/badge.svg" alt="Coverage"></a>
+    <a href="https://goreportcard.com/report/github.com/pabiadzinski/devr"><img src="https://goreportcard.com/badge/github.com/pabiadzinski/devr" alt="Go Report Card"></a>
+  </p>
+  <p align="center">
     Build, run, watch, test – all from one command.<br>
     With a built-in TUI log viewer that has vim keybindings, log level filtering, and JSON pretty-printing.
   </p>
