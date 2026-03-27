@@ -54,3 +54,8 @@ Sleep 1.5s
 # Quit
 Type "q"
 Sleep 1s
+
+# Run tests
+Type "devr test run"
+Enter
+Sleep 8s
