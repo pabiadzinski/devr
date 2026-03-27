@@ -11,7 +11,6 @@ type App struct {
 	Project string
 	WorkDir string
 	Cfg     Config
-	NoEnv   bool
 	killing atomic.Bool
 }
 

@@ -22,13 +22,16 @@ func cmdTestRun(a *App) Command {
 	)
 
 	return Command{
-		Name: "run", Usage: "Run tests (build flags from .devr.yaml)", Args: "[pkg]",
-		Flags: []Flag{
-			{Name: "format", Short: "f", Usage: "Output: dots, short, testname, verbose", Default: fmtTestname, Value: &format},
-			{Name: "short", Short: "s", Usage: "Short mode", Bool: &short},
-			{Name: "run", Short: "r", Usage: "Run only matching tests", Value: &run},
-			{Name: "timeout", Short: "t", Usage: "Timeout (e.g. 30s, 5m)", Value: &timeout},
-		},
+		Name: "run", Usage: "Run tests", Args: "[pkg]",
+		Flags: joinFlags(
+			a.Cfg.BuildCLIFlags(),
+			[]Flag{
+				{Name: "format", Short: "f", Usage: "Output: dots, short, testname, verbose", Default: fmtTestname, Value: &format},
+				{Name: "short", Short: "s", Usage: "Short mode", Bool: &short},
+				{Name: "run", Short: "r", Usage: "Run only matching tests", Value: &run},
+				{Name: "timeout", Short: "t", Usage: "Timeout (e.g. 30s, 5m)", Value: &timeout},
+			},
+		),
 		Run: func(ctx context.Context, args []string) error {
 			pkg := pkgArg(args)
 			if pkg == "" {
@@ -36,7 +39,7 @@ func cmdTestRun(a *App) Command {
 			}
 
 			goArgs := []string{"test", "-json", "-count=1"}
-			goArgs = append(goArgs, a.Cfg.Build.Flags...)
+			goArgs = append(goArgs, a.Cfg.Build.GoFlags()...)
 
 			if format == fmtVerbose {
 				goArgs = append(goArgs, "-v")
@@ -80,6 +83,7 @@ func cmdTestRun(a *App) Command {
 func cmdBench(a *App) Command {
 	return Command{
 		Name: "bench", Usage: "Run benchmarks", Args: "[pkg]",
+		Flags: a.Cfg.BuildCLIFlags(),
 		Run: func(ctx context.Context, args []string) error {
 			pkg := pkgArg(args)
 			if pkg == "" {
@@ -87,7 +91,7 @@ func cmdBench(a *App) Command {
 			}
 
 			goArgs := []string{"test", "-bench=.", "-benchmem", "-run=^$"}
-			goArgs = append(goArgs, a.Cfg.Build.Flags...)
+			goArgs = append(goArgs, a.Cfg.Build.GoFlags()...)
 			goArgs = append(goArgs, pkg)
 
 			cmd := exec.Command("go", goArgs...)
@@ -103,6 +107,7 @@ func cmdBench(a *App) Command {
 func cmdCover(a *App) Command {
 	return Command{
 		Name: "cover", Usage: "Run tests with coverage", Args: "[pkg]",
+		Flags: joinFlags(a.Cfg.BuildCLIFlags(), a.Cfg.TestCLIFlags()),
 		Run: func(ctx context.Context, args []string) error {
 			pkg := pkgArg(args)
 			if pkg == "" {
@@ -110,6 +115,7 @@ func cmdCover(a *App) Command {
 			}
 
 			profile := a.Cfg.Test.CoverProfile
+
 			cmd := exec.Command("go", "test",
 				"-coverprofile="+profile, "-covermode=atomic", "-count=1", pkg)
 			cmd.Stdout = os.Stdout

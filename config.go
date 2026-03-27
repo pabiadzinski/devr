@@ -3,6 +3,7 @@ package devr
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -22,6 +23,7 @@ type Config struct {
 type ConfigBuild struct {
 	CmdPattern string   `yaml:"cmd_pattern"`
 	Flags      []string `yaml:"flags"`
+	Race       bool     `yaml:"race"`
 }
 
 type ConfigRun struct {
@@ -58,7 +60,7 @@ func DefaultConfig() Config {
 	return Config{
 		Build: ConfigBuild{
 			CmdPattern: "cmd/*/main.go",
-			Flags:      []string{"-race"},
+			Race:       true,
 		},
 		Run: ConfigRun{
 			EnvFile: ".env",
@@ -84,6 +86,27 @@ func DefaultConfig() Config {
 			HighlightFields: []string{"msg"},
 		},
 	}
+}
+
+func (b ConfigBuild) GoFlags() []string {
+	var flags []string
+
+	if b.Race {
+		flags = append(flags, "-race")
+	}
+
+	flags = append(flags, b.Flags...)
+
+	return flags
+}
+
+func (b ConfigBuild) Label() string {
+	flags := b.GoFlags()
+	if len(flags) == 0 {
+		return ""
+	}
+
+	return strings.Join(flags, " ")
 }
 
 func LoadConfig(dir string) Config {

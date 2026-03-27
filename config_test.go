@@ -14,7 +14,8 @@ func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
 
 	assert.Equal(t, "cmd/*/main.go", cfg.Build.CmdPattern)
-	assert.Equal(t, []string{"-race"}, cfg.Build.Flags)
+	assert.True(t, cfg.Build.Race)
+	assert.Empty(t, cfg.Build.Flags)
 	assert.Equal(t, ".env", cfg.Run.EnvFile)
 	assert.Equal(t, []string{"."}, cfg.Watch.Dirs)
 	assert.Equal(t, []string{".go"}, cfg.Watch.Extensions)
@@ -87,6 +88,27 @@ func TestLoadConfig(t *testing.T) {
 
 			cfg := LoadConfig(dir)
 			tt.assert(t, cfg)
+		})
+	}
+}
+
+func TestBuildGoFlags(t *testing.T) {
+	tests := []struct {
+		name  string
+		build ConfigBuild
+		want  []string
+		label string
+	}{
+		{"race only", ConfigBuild{Race: true}, []string{"-race"}, "-race"},
+		{"extra flags", ConfigBuild{Flags: []string{"-trimpath"}}, []string{"-trimpath"}, "-trimpath"},
+		{"race and extra", ConfigBuild{Race: true, Flags: []string{"-trimpath"}}, []string{"-race", "-trimpath"}, "-race -trimpath"},
+		{"none", ConfigBuild{}, nil, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.build.GoFlags())
+			assert.Equal(t, tt.label, tt.build.Label())
 		})
 	}
 }

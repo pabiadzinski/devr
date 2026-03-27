@@ -35,24 +35,17 @@ func (a *App) FindPkg(pkg string) (string, error) {
 	return "", fmt.Errorf("could not find main.go, specify package path")
 }
 
-func (a *App) BuildFlagsLabel() string {
-	if len(a.Cfg.Build.Flags) == 0 {
-		return ""
-	}
-
-	return strings.Join(a.Cfg.Build.Flags, " ")
-}
-
 func (a *App) Build(pkg string) error {
-	if label := a.BuildFlagsLabel(); label != "" {
+	if label := a.Cfg.Build.Label(); label != "" {
 		Info("Building %s [%s]...", pkg, label)
 	} else {
 		Info("Building %s...", pkg)
 	}
 
-	args := make([]string, 0, 2+len(a.Cfg.Build.Flags)+3)
+	goFlags := a.Cfg.Build.GoFlags()
+	args := make([]string, 0, 2+len(goFlags)+3)
 	args = append(args, "build")
-	args = append(args, a.Cfg.Build.Flags...)
+	args = append(args, goFlags...)
 	args = append(args, "-o", a.BinFile(), pkg)
 	cmd := exec.Command("go", args...)
 	cmd.Dir = a.WorkDir
@@ -155,7 +148,7 @@ func (a *App) BuildAndStart(pkg string) (int, <-chan error, error) {
 func (a *App) runtimeEnv() []string {
 	env := os.Environ()
 
-	if a.NoEnv || a.Cfg.Run.NoEnv {
+	if a.Cfg.Run.NoEnv {
 		return env
 	}
 

@@ -46,29 +46,33 @@ That's it. Your app is running and you're in the log viewer.
 
 ```bash
 devr app run              # build, start, open log viewer
+devr app run --race       # enable race detector
 devr app run --no-env     # skip loading .env file
+devr app run --env-file .env.local
 devr app watch            # same, but auto-restart on .go changes
-devr app watch --no-env   # watch without env file
+devr app watch --debounce 1s
 devr app stop             # send SIGTERM to the background process
 devr app attach           # reattach to a running process
 devr app logs             # view logs from last run
 devr app ps               # list all managed processes
 ```
 
-Build flags (e.g. `-race`) are applied from `build.flags` in `.devr.yaml` and shown in the log viewer title.
+CLI flags override `.devr.yaml` config. For example, `--race` adds `-race` even if not in `build.flags`.
 
 ### Test
 
 ```bash
 devr test run             # run tests with compact output
+devr test run --race      # enable race detector
 devr test run -f dots     # minimal dot output
 devr test run -f verbose  # full verbose
 devr test run -r TestFoo  # run specific tests
 devr test bench           # run benchmarks
 devr test cover           # coverage report, opens in browser
+devr test cover --profile custom.out
 ```
 
-Tests and benchmarks also use `build.flags` from `.devr.yaml` (e.g. `-race` by default).
+All build commands use `build.flags` from `.devr.yaml` (e.g. `-race` by default). CLI `--race` flag overrides this.
 
 ### Scaffold
 

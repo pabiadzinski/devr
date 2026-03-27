@@ -3,6 +3,7 @@ package devr
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 func cmdApp(a *App) Command {
@@ -20,14 +21,10 @@ func cmdApp(a *App) Command {
 }
 
 func cmdRun(a *App) Command {
-	var noEnv bool
-
 	return Command{
-		Name: "run", Usage: "Build & run Go app with log viewer (build flags from .devr.yaml)", Args: "[pkg]",
-		Flags: []Flag{{Name: "no-env", Usage: "Skip loading .env file", Bool: &noEnv}},
+		Name: "run", Usage: "Build & run Go app with log viewer", Args: "[pkg]",
+		Flags: joinFlags(a.Cfg.BuildCLIFlags(), a.Cfg.RunCLIFlags()),
 		Run: func(ctx context.Context, args []string) error {
-			a.NoEnv = noEnv
-
 			pkg, err := a.FindPkg(pkgArg(args))
 			if err != nil {
 				return err
@@ -46,13 +43,23 @@ func cmdRun(a *App) Command {
 }
 
 func cmdWatch(a *App) Command {
-	var noEnv bool
+	var debounce string
 
 	return Command{
-		Name: "watch", Usage: "Rebuild & restart on .go file changes (build flags from .devr.yaml)", Args: "[pkg]",
-		Flags: []Flag{{Name: "no-env", Usage: "Skip loading .env file", Bool: &noEnv}},
+		Name: "watch", Usage: "Rebuild & restart on .go file changes", Args: "[pkg]",
+		Flags: joinFlags(
+			a.Cfg.BuildCLIFlags(),
+			a.Cfg.RunCLIFlags(),
+			[]Flag{{Name: "debounce", Short: "d", Usage: "Debounce duration (e.g. 500ms, 1s)", Value: &debounce}},
+		),
 		Run: func(ctx context.Context, args []string) error {
-			a.NoEnv = noEnv
+			if debounce != "" {
+				if d, err := time.ParseDuration(debounce); err == nil {
+					a.Cfg.Watch.Debounce = d
+				} else {
+					return fmt.Errorf("invalid debounce: %s", debounce)
+				}
+			}
 
 			pkg, err := a.FindPkg(pkgArg(args))
 			if err != nil {
@@ -134,7 +141,7 @@ func cmdLogs(a *App) Command {
 }
 
 func (a *App) logViewTitle(title string) string {
-	if label := a.BuildFlagsLabel(); label != "" {
+	if label := a.Cfg.Build.Label(); label != "" {
 		return title + " [" + label + "]"
 	}
 
