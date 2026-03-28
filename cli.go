@@ -220,10 +220,10 @@ func newFlagSet(flags []Flag) *flag.FlagSet {
 
 func bindFlag(fs *flag.FlagSet, f *Flag) {
 	if f.Bool != nil {
-		fs.BoolVar(f.Bool, f.Name, false, f.Usage)
+		fs.BoolVar(f.Bool, f.Name, *f.Bool, f.Usage)
 
 		if f.Short != "" {
-			fs.BoolVar(f.Bool, f.Short, false, f.Usage)
+			fs.BoolVar(f.Bool, f.Short, *f.Bool, f.Usage)
 		}
 
 		return
@@ -233,12 +233,17 @@ func bindFlag(fs *flag.FlagSet, f *Flag) {
 		f.Value = new(string)
 	}
 
-	*f.Value = f.Default
+	def := f.Default
+	if def == "" && *f.Value != "" {
+		def = *f.Value
+	} else {
+		*f.Value = def
+	}
 
-	fs.StringVar(f.Value, f.Name, f.Default, f.Usage)
+	fs.StringVar(f.Value, f.Name, def, f.Usage)
 
 	if f.Short != "" {
-		fs.StringVar(f.Value, f.Short, f.Default, f.Usage)
+		fs.StringVar(f.Value, f.Short, def, f.Usage)
 	}
 }
 

@@ -51,7 +51,7 @@ That's it. Your app is running and you're in the log viewer.
 
 ```bash
 devr app run              # build, start, open log viewer
-devr app run --race       # enable race detector
+devr app run --race=false # disable race detector (enabled by default)
 devr app run --no-env     # skip loading .env file
 devr app run --env-file .env.local
 devr app watch            # same, but auto-restart on .go changes
@@ -62,22 +62,19 @@ devr app logs             # view logs from last run
 devr app ps               # list all managed processes
 ```
 
-CLI flags override `.devr.yaml` config. For example, `--race` adds `-race` even if not in `build.flags`.
+CLI flags override `.devr.yaml` values. Race detector is enabled by default.
 
 ### Test
 
 ```bash
 devr test run             # run tests with compact output
-devr test run --race      # enable race detector
 devr test run -f dots     # minimal dot output
 devr test run -f verbose  # full verbose
 devr test run -r TestFoo  # run specific tests
 devr test bench           # run benchmarks
 devr test cover           # coverage report, opens in browser
-devr test cover --profile custom.out
+devr test cover -p custom.out
 ```
-
-All build commands use `build.flags` from `.devr.yaml` (e.g. `-race` by default). CLI `--race` flag overrides this.
 
 ### Scaffold
 
@@ -124,10 +121,12 @@ Drop a `.devr.yaml` in your project root to customize behavior. All fields are o
 ```yaml
 build:
   cmd_pattern: "cmd/*/main.go"
-  flags: ["-race"]
+  race: true              # enabled by default, use --race=false to disable
+  flags: ["-trimpath"]    # extra go build flags
 
 run:
-  env_file: ".env"       # or .env.local, etc. (defaults to .env)
+  env_file: ".env"        # or .env.local, etc. (defaults to .env)
+  no_env: false           # skip loading env file
 
 watch:
   extensions: [".go"]
@@ -135,8 +134,8 @@ watch:
   debounce: 500ms
 
 logs:
-  format: auto          # auto, json, or text
-  level_field: level    # JSON field or key=value field for level
+  format: auto            # auto, json, or text
+  level_field: level      # JSON field or key=value field for level
   level_values:
     error: ["error", "err", "fatal"]
     warn: ["warn", "warning"]

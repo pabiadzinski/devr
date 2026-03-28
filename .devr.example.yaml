@@ -3,10 +3,12 @@
 
 build:
   cmd_pattern: "cmd/*/main.go"
-  flags: ["-race"]
+  race: true            # --race=false to disable
+  flags: []             # extra go build flags, e.g. ["-trimpath"]
 
 run:
-  env_file: ""  # explicit: .env, .env.local, etc.
+  env_file: ".env"
+  no_env: false
 
 watch:
   dirs: ["."]
