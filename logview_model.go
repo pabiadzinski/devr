@@ -40,6 +40,8 @@ type logViewModel struct {
 	filter          string
 	filterLower     string
 	preview         bool
+	previewOffset   int
+	previewLines    []string
 	follow          bool
 	mode            logViewMode
 	searchBuf       string
@@ -59,7 +61,6 @@ var (
 	styleWarn     = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
 	styleInfo     = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
 	styleDebug    = lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
-	styleTime     = lipgloss.NewStyle().Foreground(lipgloss.Color("14"))
 	styleDim      = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 	styleMatch    = lipgloss.NewStyle().Background(lipgloss.Color("11")).Foreground(lipgloss.Color("0"))
 	styleCtrlC    = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
@@ -363,6 +364,14 @@ func highlightAll(line, search, searchLower string, style lipgloss.Style) string
 	return b.String()
 }
 
+var (
+	styleJSONKey    = lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
+	styleJSONString = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
+	styleJSONNumber = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
+	styleJSONBool   = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
+	styleJSONNull   = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+)
+
 func formatJSON(raw string) string {
 	var obj any
 	if err := json.Unmarshal([]byte(raw), &obj); err != nil {
@@ -375,4 +384,61 @@ func formatJSON(raw string) string {
 	}
 
 	return string(pretty)
+}
+
+func colorizeJSON(raw string) []string {
+	formatted := formatJSON(raw)
+	if formatted == raw {
+		return []string{raw}
+	}
+
+	var out []string
+
+	for _, line := range strings.Split(formatted, "\n") {
+		out = append(out, colorizeJSONLine(line))
+	}
+
+	return out
+}
+
+func colorizeJSONLine(line string) string {
+	trimmed := strings.TrimSpace(line)
+	indent := line[:len(line)-len(trimmed)]
+
+	if trimmed == "{" || trimmed == "}" || trimmed == "}," ||
+		trimmed == "[" || trimmed == "]" || trimmed == "]," {
+		return indent + styleDim.Render(trimmed)
+	}
+
+	colonIdx := strings.Index(trimmed, ": ")
+	if colonIdx < 0 || !strings.HasPrefix(trimmed, `"`) {
+		return indent + colorizeJSONValue(trimmed)
+	}
+
+	key := trimmed[:colonIdx]
+	val := trimmed[colonIdx+2:]
+
+	return indent + styleJSONKey.Render(key) + styleDim.Render(": ") + colorizeJSONValue(val)
+}
+
+func colorizeJSONValue(val string) string {
+	clean := strings.TrimSuffix(val, ",")
+	comma := ""
+
+	if len(clean) < len(val) {
+		comma = styleDim.Render(",")
+	}
+
+	switch {
+	case strings.HasPrefix(clean, `"`):
+		return styleJSONString.Render(clean) + comma
+	case clean == "true" || clean == "false":
+		return styleJSONBool.Render(clean) + comma
+	case clean == "null":
+		return styleJSONNull.Render(clean) + comma
+	case len(clean) > 0 && (clean[0] >= '0' && clean[0] <= '9' || clean[0] == '-'):
+		return styleJSONNumber.Render(clean) + comma
+	default:
+		return val
+	}
 }

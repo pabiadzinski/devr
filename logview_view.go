@@ -49,17 +49,19 @@ func (m logViewModel) View() string {
 		b.WriteString("\n")
 	}
 
-	if m.preview && m.cursor < len(m.filtered) {
-		idx := m.filtered[m.cursor]
+	if m.preview && len(m.previewLines) > 0 {
 		previewH := m.height - viewH - 2
-		preview := formatJSON(m.lines[idx].raw)
-		lines := strings.Split(preview, "\n")
 
 		b.WriteString(styleDim.Render(strings.Repeat("─", m.width)))
 		b.WriteString("\n")
 
-		for i := 0; i < previewH && i < len(lines); i++ {
-			b.WriteString(styleTime.Render(lines[i]))
+		end := m.previewOffset + previewH
+		if end > len(m.previewLines) {
+			end = len(m.previewLines)
+		}
+
+		for i := m.previewOffset; i < end; i++ {
+			b.WriteString(m.previewLines[i])
 			b.WriteString("\n")
 		}
 	}
@@ -141,6 +143,7 @@ func (m logViewModel) renderHelp() string {
 		{"w", "Toggle line wrap"},
 		{"Alt+Enter", "Insert marker line"},
 		{"Tab", "Toggle JSON preview"},
+		{"J / K", "Scroll preview down/up"},
 		{"Enter", "Insert blank line"},
 		{"y", "Copy line to clipboard"},
 		{"q", "Detach (process keeps running)"},
