@@ -118,6 +118,34 @@ func TestWatchDebouncesMatchingEvents(t *testing.T) {
 	assert.Equal(t, int32(1), calls.Load())
 }
 
+func TestMatchExt(t *testing.T) {
+	tests := []struct {
+		name string
+		file string
+		exts []string
+		want bool
+	}{
+		{"match .go", "main.go", []string{".go"}, true},
+		{"match .templ", "page.templ", []string{".go", ".templ"}, true},
+		{"no match", "readme.md", []string{".go"}, false},
+		{"empty exts", "main.go", nil, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, matchExt(tt.file, tt.exts))
+		})
+	}
+}
+
+func TestMakeExcludeSet(t *testing.T) {
+	set := makeExcludeSet([]string{"vendor", "tmp"})
+	assert.Len(t, set, 2)
+	_, ok := set["vendor"]
+	assert.True(t, ok)
+	_, ok = set["other"]
+	assert.False(t, ok)
+}
+
 func TestWatchIgnoresExcludedDirectories(t *testing.T) {
 	root := t.TempDir()
 	excluded := filepath.Join(root, "vendor")

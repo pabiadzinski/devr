@@ -180,3 +180,118 @@ func TestTestFormatterPrintFailures(t *testing.T) {
 	assert.Contains(t, out, "FAILURES")
 	assert.Contains(t, out, "expected: true")
 }
+
+func TestIsFailKey(t *testing.T) {
+	f := &testFormatter{
+		pkgFailed: map[string]bool{
+			"github.com/user/repo/pkg": true,
+		},
+	}
+
+	tests := []struct {
+		key  string
+		want bool
+	}{
+		{"github.com/user/repo/pkg/TestFoo", true},
+		{"github.com/user/repo/other/TestBar", false},
+		{"github.com/user/repo/pkg", false},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, f.isFailKey(tt.key), tt.key)
+	}
+}
+
+func TestTestFormatterVerboseFullCoverage(t *testing.T) {
+	input := strings.Join([]string{
+		jsonEvent("run", "pkg", "TestA", "", 0),
+		jsonEvent("output", "pkg", "TestA", "--- PASS: TestA (0.00s)\n", 0),
+		jsonEvent("pass", "pkg", "TestA", "", 0.001),
+		jsonEvent("run", "pkg", "TestB", "", 0),
+		jsonEvent("output", "pkg", "TestB", "--- FAIL: TestB (0.00s)\n", 0),
+		jsonEvent("fail", "pkg", "TestB", "", 0.001),
+		jsonEvent("run", "pkg", "TestC", "", 0),
+		jsonEvent("output", "pkg", "TestC", "--- SKIP: TestC (0.00s)\n", 0),
+		jsonEvent("skip", "pkg", "TestC", "", 0),
+		jsonEvent("output", "pkg", "", "PASS\n", 0),
+		jsonEvent("output", "pkg", "", "FAIL\n", 0),
+		jsonEvent("output", "pkg", "", "ok  pkg 0.1s\n", 0),
+		jsonEvent("output", "pkg", "", "=== RUN TestD\n", 0),
+		jsonEvent("output", "pkg", "", "plain output\n", 0),
+		jsonEvent("fail", "pkg", "", "", 0.1),
+	}, "\n")
+
+	var buf bytes.Buffer
+
+	f := newTestFormatter(&buf, fmtVerbose)
+	f.Process(strings.NewReader(input))
+
+	assert.Equal(t, 1, f.passed)
+	assert.Equal(t, 1, f.failed)
+	assert.Equal(t, 1, f.skipped)
+	assert.True(t, f.pkgFailed["pkg"])
+
+	out := buf.String()
+	assert.Contains(t, out, "PASS")
+	assert.Contains(t, out, "FAIL")
+	assert.Contains(t, out, "SKIP")
+	assert.Contains(t, out, "plain output")
+}
+
+func TestTestFormatterDotsLineWrap(t *testing.T) {
+	var events []string
+
+	for i := 0; i < 85; i++ {
+		events = append(events, jsonEvent("pass", "pkg", fmt.Sprintf("Test%d", i), "", 0))
+	}
+
+	events = append(events, jsonEvent("pass", "pkg", "", "", 0.5))
+
+	var buf bytes.Buffer
+
+	f := newTestFormatter(&buf, fmtDots)
+	f.Process(strings.NewReader(strings.Join(events, "\n")))
+
+	assert.Equal(t, 85, f.passed)
+	assert.Contains(t, buf.String(), "\n")
+}
+
+func TestTestFormatterProcessInvalidJSON(t *testing.T) {
+	var buf bytes.Buffer
+
+	f := newTestFormatter(&buf, fmtDots)
+	f.Process(strings.NewReader("not json at all"))
+
+	assert.Contains(t, buf.String(), "not json at all")
+}
+
+func TestTestFormatterTestnameFailedPkg(t *testing.T) {
+	input := strings.Join([]string{
+		jsonEvent("fail", "pkg/a", "TestX", "", 0),
+		jsonEvent("fail", "pkg/a", "", "", 0.1),
+	}, "\n")
+
+	var buf bytes.Buffer
+
+	f := newTestFormatter(&buf, fmtTestname)
+	f.Process(strings.NewReader(input))
+
+	assert.Equal(t, 1, f.failed)
+	assert.Contains(t, buf.String(), "✗")
+}
+
+func TestTestFormatterShortFailedPkg(t *testing.T) {
+	input := strings.Join([]string{
+		jsonEvent("fail", "github.com/user/repo/api", "TestA", "", 0),
+		jsonEvent("output", "github.com/user/repo/api", "", "build error\n", 0),
+		jsonEvent("fail", "github.com/user/repo/api", "", "", 0.2),
+	}, "\n")
+
+	var buf bytes.Buffer
+
+	f := newTestFormatter(&buf, fmtShort)
+	f.Process(strings.NewReader(input))
+
+	assert.Equal(t, 1, f.failed)
+	assert.Contains(t, buf.String(), "✗")
+	assert.Contains(t, buf.String(), "api")
+}

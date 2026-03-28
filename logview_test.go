@@ -412,3 +412,282 @@ func TestUpdateSearchInputSpace(t *testing.T) {
 	got := updated.(logViewModel)
 	assert.Equal(t, " ", got.searchBuf)
 }
+
+func TestFilterLabel(t *testing.T) {
+	assert.Equal(t, "all", filterLabel(""))
+	assert.Equal(t, "error", filterLabel("error"))
+}
+
+func TestLogHeight(t *testing.T) {
+	tests := []struct {
+		name    string
+		height  int
+		preview bool
+		want    int
+	}{
+		{"normal", 20, false, 17},
+		{"with preview", 20, true, 8},
+		{"tiny", 2, false, 1},
+		{"zero", 0, false, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := logViewModel{height: tt.height, preview: tt.preview}
+			assert.Equal(t, tt.want, m.logHeight())
+		})
+	}
+}
+
+func TestColorizeJSON(t *testing.T) {
+	lines := colorizeJSON(`{"key":"value"}`)
+	assert.Greater(t, len(lines), 1)
+
+	lines = colorizeJSON("not json")
+	assert.Equal(t, []string{"not json"}, lines)
+}
+
+func TestColorizeJSONValue(t *testing.T) {
+	tests := []struct {
+		input string
+	}{
+		{`"hello"`},
+		{`"hello",`},
+		{"true"},
+		{"false"},
+		{"null"},
+		{"42"},
+		{"-1"},
+		{"42,"},
+		{"{"},
+	}
+	for _, tt := range tests {
+		out := colorizeJSONValue(tt.input)
+		assert.NotEmpty(t, out, tt.input)
+	}
+}
+
+func TestColorizeJSONLine(t *testing.T) {
+	assert.NotEmpty(t, colorizeJSONLine(`  "key": "value"`))
+	assert.NotEmpty(t, colorizeJSONLine(`  {`))
+	assert.NotEmpty(t, colorizeJSONLine(`  }`))
+	assert.NotEmpty(t, colorizeJSONLine(`  },`))
+	assert.NotEmpty(t, colorizeJSONLine(`  [`))
+	assert.NotEmpty(t, colorizeJSONLine(`  ]`))
+	assert.NotEmpty(t, colorizeJSONLine(`  ],`))
+	assert.NotEmpty(t, colorizeJSONLine(`  "key": 42`))
+}
+
+func TestHighlightJSONField(t *testing.T) {
+	line := `{"msg":"hello world","level":"info"}`
+
+	out := highlightJSONField(line, "msg")
+	assert.Contains(t, out, "hello world")
+
+	same := highlightJSONField(line, "nonexistent")
+	assert.Equal(t, line, same)
+}
+
+func TestLogEntryRenderMarker(t *testing.T) {
+	entry := logEntry{raw: "── MARKER ──", isMarker: true}
+
+	selected := entry.render(true, "", "", "", "", 80, nil)
+	assert.Contains(t, selected, "━")
+
+	normal := entry.render(false, "", "", "", "", 80, nil)
+	assert.Contains(t, normal, "━")
+}
+
+func TestLogEntryRenderWithLevelKeywords(t *testing.T) {
+	entry := logEntry{raw: `level=ERROR msg="boom"`, lower: `level=error msg="boom"`}
+	out := entry.render(false, "", "", "", "", 80, nil)
+	assert.Contains(t, out, "ERROR")
+}
+
+func TestLogEntryRenderSelected(t *testing.T) {
+	entry := logEntry{raw: "test line", lower: "test line"}
+	out := entry.render(true, "", "", "", "", 80, nil)
+	assert.Contains(t, out, ">>")
+}
+
+func TestCountVisualLines(t *testing.T) {
+	m := newModel()
+	m.width = 80
+	m.wrap = false
+	m.lines = []logEntry{parseLine("short line")}
+
+	m.refilter()
+
+	assert.Equal(t, 1, m.countVisualLines(0))
+	assert.Equal(t, 0, m.countVisualLines(99))
+}
+
+func TestEnsureVisibleScrollsDown(t *testing.T) {
+	m := newModel()
+	m.height = 5
+	m.width = 80
+	m.wrap = false
+
+	for i := 0; i < 20; i++ {
+		m.lines = append(m.lines, parseLine("line"))
+	}
+
+	m.refilter()
+
+	m.cursor = 15
+	m.offset = 0
+	m.ensureVisible()
+	assert.Greater(t, m.offset, 0)
+}
+
+func TestEnsureVisibleScrollsUp(t *testing.T) {
+	m := newModel()
+	m.height = 10
+	m.width = 80
+
+	for i := 0; i < 20; i++ {
+		m.lines = append(m.lines, parseLine("line"))
+	}
+
+	m.refilter()
+
+	m.offset = 10
+	m.cursor = 5
+	m.ensureVisible()
+	assert.Equal(t, 5, m.offset)
+}
+
+func TestWindowSizeMsg(t *testing.T) {
+	m := newModel()
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	got := updated.(logViewModel)
+	assert.Equal(t, 120, got.width)
+	assert.Equal(t, 40, got.height)
+}
+
+func TestTitleMsg(t *testing.T) {
+	m := newModel()
+	updated, _ := m.Update(titleMsg("WATCH"))
+	got := updated.(logViewModel)
+	assert.Equal(t, "WATCH", got.title)
+}
+
+func TestClearWarningMsg(t *testing.T) {
+	m := newModel()
+	m.ctrlCOnce = true
+	updated, _ := m.Update(clearWarningMsg{})
+	got := updated.(logViewModel)
+	assert.False(t, got.ctrlCOnce)
+}
+
+func TestUpdateSearchEsc(t *testing.T) {
+	m := newModel()
+	m.height = 10
+	m.width = 80
+	m.mode = modeSearch
+	m.filter = "old"
+	m.searchBuf = "new"
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	got := updated.(logViewModel)
+	assert.Equal(t, modeNormal, got.mode)
+	assert.Equal(t, "old", got.searchBuf)
+}
+
+func TestUpdateSearchCtrlU(t *testing.T) {
+	m := newModel()
+	m.height = 10
+	m.width = 80
+	m.mode = modeSearch
+	m.searchBuf = "test"
+	m.lines = []logEntry{parseLine("line")}
+	m.refilter()
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlU})
+	got := updated.(logViewModel)
+	assert.Equal(t, "", got.searchBuf)
+	assert.Equal(t, "", got.filter)
+}
+
+func TestUpdateNormalEnterAddsBlankLine(t *testing.T) {
+	m := newModel()
+	m.height = 20
+	m.width = 80
+	m.lines = []logEntry{parseLine("existing")}
+	m.refilter()
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := updated.(logViewModel)
+	assert.Len(t, got.lines, 2)
+	assert.Equal(t, "", got.lines[1].raw)
+}
+
+func TestUpdateNormalQDetaches(t *testing.T) {
+	m := newModel()
+	m.height = 10
+	m.width = 80
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	got := updated.(logViewModel)
+	assert.Equal(t, exitDetach, got.exit)
+	assert.NotNil(t, cmd)
+}
+
+func TestStatusFooter(t *testing.T) {
+	m := newModel()
+	m.filtered = []int{0, 1, 2}
+	m.cursor = 1
+	m.follow = true
+	m.wrap = true
+	m.search = "test"
+	m.title = "RUN"
+
+	footer := m.statusFooter()
+	assert.Contains(t, footer, "RUN")
+	assert.Contains(t, footer, "FOLLOW")
+	assert.Contains(t, footer, "WRAP")
+	assert.Contains(t, footer, "SEARCH")
+	assert.Contains(t, footer, "2/3")
+}
+
+func TestHighlightSearchEsc(t *testing.T) {
+	m := newModel()
+	m.height = 10
+	m.width = 80
+	m.mode = modeHighlightSearch
+	m.search = "old"
+	m.searchBuf = "new"
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	got := updated.(logViewModel)
+	assert.Equal(t, modeNormal, got.mode)
+	assert.Equal(t, "old", got.searchBuf)
+}
+
+func TestMatchFilter(t *testing.T) {
+	m := newModel()
+
+	entry := logEntry{lower: "error: something failed"}
+	assert.True(t, m.matchFilter(entry))
+
+	m.filter = "error"
+	m.filterLower = "error"
+	assert.True(t, m.matchFilter(entry))
+
+	m.filter = "warn"
+	m.filterLower = "warn"
+	assert.False(t, m.matchFilter(entry))
+}
+
+func TestAppendLineFiltered(t *testing.T) {
+	m := newModel()
+	m.height = 10
+	m.width = 80
+	m.filter = "error"
+	m.filterLower = "error"
+
+	m.appendLine(parseLine(`{"level":"info","msg":"ok"}`))
+	assert.Len(t, m.filtered, 0)
+
+	m.appendLine(parseLine(`{"level":"error","msg":"fail"}`))
+	assert.Len(t, m.filtered, 1)
+}
