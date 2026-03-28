@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -19,16 +22,22 @@ jobs:
       - name: Build
         run: go build ./...
 
-      - name: Test
-        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
 
-      - name: Coverage
-        run: go tool cover -func=coverage.out
+      - name: Test
+        run: gotestsum --junitfile junit.xml -- -race -coverprofile=coverage.out -covermode=atomic ./...
 
       - name: Upload coverage
         uses: codecov/codecov-action@v5
         with:
           files: coverage.out
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          files: junit.xml
 
       - name: Vet
         run: go vet ./...
