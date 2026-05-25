@@ -259,13 +259,6 @@ var levelKeywords = []string{
 	"DEBUG", "debug",
 }
 
-var levelStyles = map[string]lipgloss.Style{
-	"ERROR": styleError, "error": styleError,
-	"WARN": styleWarn, "WARNING": styleWarn, "warn": styleWarn, "warning": styleWarn,
-	"INFO": styleInfo, "info": styleInfo,
-	"DEBUG": styleDebug, "debug": styleDebug,
-}
-
 func (e logEntry) render(selected bool, filter, filterLower, search, searchLower string, width int, highlightFields []string) string {
 	if e.isMarker {
 		markerWidth := width - 5 // account for padding and cursor
@@ -292,7 +285,8 @@ func (e logEntry) render(selected bool, filter, filterLower, search, searchLower
 
 	for _, kw := range levelKeywords {
 		if idx := strings.Index(line, kw); idx >= 0 {
-			line = line[:idx] + levelStyles[kw].Render(kw) + line[idx+len(kw):]
+			a := levelAffix[kw]
+			line = line[:idx] + a.pre + kw + a.suf + line[idx+len(kw):]
 
 			break
 		}
@@ -303,11 +297,11 @@ func (e logEntry) render(selected bool, filter, filterLower, search, searchLower
 	}
 
 	if filter != "" {
-		line = highlightAll(line, filter, filterLower, styleMatch)
+		line = highlightAll(line, filter, filterLower, ansiMatchPre, ansiMatchSuf)
 	}
 
 	if search != "" {
-		line = highlightAll(line, search, searchLower, styleSearchHL)
+		line = highlightAll(line, search, searchLower, ansiSearchPre, ansiSearchSuf)
 	}
 
 	return line
@@ -336,32 +330,73 @@ func highlightJSONField(line, field string) string {
 		return line
 	}
 
-	content := line[start:end]
-	highlighted := line[:start] + styleMsg.Render(content) + line[end:]
-
-	return highlighted
+	return line[:start] + ansiMsgPre + line[start:end] + ansiMsgSuf + line[end:]
 }
 
-func highlightAll(line, search, searchLower string, style lipgloss.Style) string {
-	lower := strings.ToLower(line)
+// ansiSeqLen returns the byte length of the CSI escape sequence at the start of
+// s, or 0 if s does not begin with one.
+func ansiSeqLen(s string) int {
+	if len(s) < 2 || s[0] != 0x1b || s[1] != '[' {
+		return 0
+	}
+
+	for i := 2; i < len(s); i++ {
+		if s[i] >= 0x40 && s[i] <= 0x7e {
+			return i + 1
+		}
+	}
+
+	return 0
+}
+
+func highlightAll(line, search, searchLower, pre, suf string) string {
+	if search == "" {
+		return line
+	}
 
 	var b strings.Builder
 
-	pos := 0
+	// Skip over ANSI escape sequences already in the line (level/field coloring)
+	// so a search term that occurs inside one isn't matched and spliced apart.
+	i := 0
+	for i < len(line) {
+		if n := ansiSeqLen(line[i:]); n > 0 {
+			b.WriteString(line[i : i+n])
+			i += n
 
-	for {
-		idx := strings.Index(lower[pos:], searchLower)
-		if idx < 0 {
-			b.WriteString(line[pos:])
-			break
+			continue
 		}
 
-		b.WriteString(line[pos : pos+idx])
-		b.WriteString(style.Render(line[pos+idx : pos+idx+len(search)]))
-		pos += idx + len(search)
+		j := i
+		for j < len(line) && (line[j] != 0x1b || ansiSeqLen(line[j:]) == 0) {
+			j++
+		}
+
+		highlightSegment(&b, line[i:j], search, searchLower, pre, suf)
+		i = j
 	}
 
 	return b.String()
+}
+
+func highlightSegment(b *strings.Builder, seg, search, searchLower, pre, suf string) {
+	lower := strings.ToLower(seg)
+
+	pos := 0
+	for {
+		idx := strings.Index(lower[pos:], searchLower)
+		if idx < 0 {
+			b.WriteString(seg[pos:])
+			break
+		}
+
+		b.WriteString(seg[pos : pos+idx])
+		b.WriteString(pre)
+		b.WriteString(seg[pos+idx : pos+idx+len(search)])
+		b.WriteString(suf)
+
+		pos += idx + len(search)
+	}
 }
 
 var (
@@ -371,6 +406,53 @@ var (
 	styleJSONBool   = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
 	styleJSONNull   = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 )
+
+// ANSI prefix/suffix pairs precomputed from the styles above, so per-line
+// rendering concatenates strings instead of invoking lipgloss. They capture the
+// color profile detected at init; the viewer never changes it at runtime.
+var (
+	ansiDimPre, ansiDimSuf       = ansiPair(styleDim)
+	ansiKeyPre, ansiKeySuf       = ansiPair(styleJSONKey)
+	ansiStringPre, ansiStringSuf = ansiPair(styleJSONString)
+	ansiNumberPre, ansiNumberSuf = ansiPair(styleJSONNumber)
+	ansiBoolPre, ansiBoolSuf     = ansiPair(styleJSONBool)
+	ansiNullPre, ansiNullSuf     = ansiPair(styleJSONNull)
+	ansiMatchPre, ansiMatchSuf   = ansiPair(styleMatch)
+	ansiSearchPre, ansiSearchSuf = ansiPair(styleSearchHL)
+	ansiMsgPre, ansiMsgSuf       = ansiPair(styleMsg)
+	ansiErrorPre, ansiErrorSuf   = ansiPair(styleError)
+	ansiWarnPre, ansiWarnSuf     = ansiPair(styleWarn)
+	ansiInfoPre, ansiInfoSuf     = ansiPair(styleInfo)
+	ansiDebugPre, ansiDebugSuf   = ansiPair(styleDebug)
+)
+
+type ansiAffix struct{ pre, suf string }
+
+var levelAffix = map[string]ansiAffix{
+	"ERROR":   {ansiErrorPre, ansiErrorSuf},
+	"error":   {ansiErrorPre, ansiErrorSuf},
+	"WARN":    {ansiWarnPre, ansiWarnSuf},
+	"WARNING": {ansiWarnPre, ansiWarnSuf},
+	"warn":    {ansiWarnPre, ansiWarnSuf},
+	"warning": {ansiWarnPre, ansiWarnSuf},
+	"INFO":    {ansiInfoPre, ansiInfoSuf},
+	"info":    {ansiInfoPre, ansiInfoSuf},
+	"DEBUG":   {ansiDebugPre, ansiDebugSuf},
+	"debug":   {ansiDebugPre, ansiDebugSuf},
+}
+
+func ansiPair(s lipgloss.Style) (string, string) {
+	const sentinel = "\x00"
+
+	rendered := s.Render(sentinel)
+	idx := strings.Index(rendered, sentinel)
+
+	if idx < 0 {
+		return "", ""
+	}
+
+	return rendered[:idx], rendered[idx+len(sentinel):]
+}
 
 func formatJSON(raw string) string {
 	var obj any
@@ -392,10 +474,11 @@ func colorizeJSON(raw string) []string {
 		return []string{raw}
 	}
 
-	var out []string
+	lines := strings.Split(formatted, "\n")
+	out := make([]string, len(lines))
 
-	for _, line := range strings.Split(formatted, "\n") {
-		out = append(out, colorizeJSONLine(line))
+	for i, line := range lines {
+		out[i] = colorizeJSONLine(line)
 	}
 
 	return out
@@ -407,7 +490,7 @@ func colorizeJSONLine(line string) string {
 
 	if trimmed == "{" || trimmed == "}" || trimmed == "}," ||
 		trimmed == "[" || trimmed == "]" || trimmed == "]," {
-		return indent + styleDim.Render(trimmed)
+		return indent + ansiDimPre + trimmed + ansiDimSuf
 	}
 
 	colonIdx := strings.Index(trimmed, ": ")
@@ -418,7 +501,7 @@ func colorizeJSONLine(line string) string {
 	key := trimmed[:colonIdx]
 	val := trimmed[colonIdx+2:]
 
-	return indent + styleJSONKey.Render(key) + styleDim.Render(": ") + colorizeJSONValue(val)
+	return indent + ansiKeyPre + key + ansiKeySuf + ansiDimPre + ": " + ansiDimSuf + colorizeJSONValue(val)
 }
 
 func colorizeJSONValue(val string) string {
@@ -426,18 +509,18 @@ func colorizeJSONValue(val string) string {
 	comma := ""
 
 	if len(clean) < len(val) {
-		comma = styleDim.Render(",")
+		comma = ansiDimPre + "," + ansiDimSuf
 	}
 
 	switch {
 	case strings.HasPrefix(clean, `"`):
-		return styleJSONString.Render(clean) + comma
+		return ansiStringPre + clean + ansiStringSuf + comma
 	case clean == "true" || clean == "false":
-		return styleJSONBool.Render(clean) + comma
+		return ansiBoolPre + clean + ansiBoolSuf + comma
 	case clean == "null":
-		return styleJSONNull.Render(clean) + comma
+		return ansiNullPre + clean + ansiNullSuf + comma
 	case len(clean) > 0 && (clean[0] >= '0' && clean[0] <= '9' || clean[0] == '-'):
-		return styleJSONNumber.Render(clean) + comma
+		return ansiNumberPre + clean + ansiNumberSuf + comma
 	default:
 		return val
 	}

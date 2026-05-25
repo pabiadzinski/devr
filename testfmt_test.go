@@ -295,3 +295,124 @@ func TestTestFormatterShortFailedPkg(t *testing.T) {
 	assert.Contains(t, buf.String(), "✗")
 	assert.Contains(t, buf.String(), "api")
 }
+
+func TestHandleVerboseOutputBranches(t *testing.T) {
+	tests := []struct {
+		name     string
+		output   string
+		contains string
+	}{
+		{"pass line", "--- PASS: TestX (0.00s)", green},
+		{"fail line", "--- FAIL: TestX (0.00s)", red},
+		{"skip line", "--- SKIP: TestX (0.00s)", yellow},
+		{"PASS", "PASS", green},
+		{"FAIL", "FAIL", red},
+		{"ok line", "ok  pkg 0.1s", green},
+		{"RUN line", "=== RUN TestX", dim},
+		{"default", "some normal output", "some normal output"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+
+			f := newTestFormatter(&buf, fmtVerbose)
+			f.handleVerbose(testEvent{Action: "output", Package: "pkg", Output: tt.output + "\n"})
+			assert.Contains(t, buf.String(), tt.contains)
+		})
+	}
+}
+
+func TestHandleVerboseCounters(t *testing.T) {
+	tests := []struct {
+		name    string
+		action  string
+		test    string
+		wantP   int
+		wantF   int
+		wantS   int
+		wantPkg bool
+	}{
+		{"test pass", "pass", "TestA", 1, 0, 0, false},
+		{"test fail", "fail", "TestA", 0, 1, 0, false},
+		{"test skip", "skip", "TestA", 0, 0, 1, false},
+		{"pkg fail", "fail", "", 0, 0, 0, true},
+		{"pkg pass", "pass", "", 0, 0, 0, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+
+			f := newTestFormatter(&buf, fmtVerbose)
+			f.handleVerbose(testEvent{Action: tt.action, Package: "pkg", Test: tt.test})
+			assert.Equal(t, tt.wantP, f.passed)
+			assert.Equal(t, tt.wantF, f.failed)
+			assert.Equal(t, tt.wantS, f.skipped)
+			assert.Equal(t, tt.wantPkg, f.pkgFailed["pkg"])
+		})
+	}
+}
+
+func TestHandleVerboseNonOutputReturnsEarly(t *testing.T) {
+	var buf bytes.Buffer
+
+	f := newTestFormatter(&buf, fmtVerbose)
+	f.handleVerbose(testEvent{Action: "run", Package: "pkg", Test: "TestX"})
+	assert.Empty(t, buf.String())
+}
+
+func TestCollectFailOutput(t *testing.T) {
+	f := newTestFormatter(nil, fmtShort)
+
+	f.collectFailOutput(testEvent{Action: "run", Package: "pkg", Test: "TestA"})
+	assert.Empty(t, f.failOrder)
+
+	f.collectFailOutput(testEvent{Action: "output", Package: "pkg", Test: "TestA", Output: "line1\n"})
+	assert.Equal(t, []string{"pkg/TestA"}, f.failOrder)
+	assert.Equal(t, []string{"line1\n"}, f.failOutput["pkg/TestA"])
+
+	f.collectFailOutput(testEvent{Action: "output", Package: "pkg", Test: "TestA", Output: "line2\n"})
+	assert.Equal(t, []string{"pkg/TestA"}, f.failOrder)
+	assert.Equal(t, []string{"line1\n", "line2\n"}, f.failOutput["pkg/TestA"])
+
+	f.collectFailOutput(testEvent{Action: "output", Package: "pkg", Output: "pkg-level\n"})
+	assert.Equal(t, []string{"pkg/TestA", "pkg"}, f.failOrder)
+	assert.Equal(t, []string{"pkg-level\n"}, f.failOutput["pkg"])
+}
+
+func TestPrintFailuresNoFails(t *testing.T) {
+	var buf bytes.Buffer
+
+	f := newTestFormatter(&buf, fmtShort)
+	f.failed = 0
+	f.printFailures()
+	assert.Empty(t, buf.String())
+}
+
+func TestPrintFailuresFiltering(t *testing.T) {
+	var buf bytes.Buffer
+
+	f := newTestFormatter(&buf, fmtShort)
+	f.failed = 1
+	f.pkgFailed["pkg"] = true
+	f.failOrder = []string{"pkg/TestBad"}
+	f.failOutput["pkg/TestBad"] = []string{
+		"=== RUN TestBad\n",
+		"--- FAIL: TestBad (0.00s)\n",
+		"FAIL pkg\n",
+		"\n",
+		"    expected: 42\n",
+		"    got: 0\n",
+	}
+
+	f.printFailures()
+
+	out := buf.String()
+
+	assert.Contains(t, out, "FAILURES")
+	assert.Contains(t, out, "pkg/TestBad")
+	assert.Contains(t, out, "expected: 42")
+	assert.Contains(t, out, "got: 0")
+	assert.NotContains(t, out, "=== RUN")
+	assert.NotContains(t, out, "--- FAIL")
+	assert.Equal(t, 1, strings.Count(out, "expected"))
+}
