@@ -69,11 +69,13 @@ func (m logViewModel) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.cursor > 0 {
 			m.cursor--
 			m.ensureVisible()
+			m.updatePreview()
 		}
 	case "down", "j":
 		if m.cursor < len(m.filtered)-1 {
 			m.cursor++
 			m.ensureVisible()
+			m.updatePreview()
 		}
 
 		if m.cursor == len(m.filtered)-1 {
@@ -125,6 +127,15 @@ func (m logViewModel) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "tab":
 		m.preview = !m.preview
+		m.updatePreview()
+	case "J":
+		if m.preview && m.previewOffset < len(m.previewLines)-1 {
+			m.previewOffset++
+		}
+	case "K":
+		if m.preview && m.previewOffset > 0 {
+			m.previewOffset--
+		}
 	case "?":
 		m.mode = modeHelp
 	case "/":
@@ -248,6 +259,7 @@ func (m *logViewModel) moveBy(delta int) {
 	}
 
 	m.ensureVisible()
+	m.updatePreview()
 }
 
 func (m *logViewModel) appendLine(entry logEntry) {
@@ -266,6 +278,18 @@ func (m *logViewModel) appendLine(entry logEntry) {
 func (m *logViewModel) appendNewEntry(entry logEntry) {
 	m.follow = true
 	m.appendLine(entry)
+}
+
+func (m *logViewModel) updatePreview() {
+	m.previewOffset = 0
+
+	if !m.preview || m.cursor >= len(m.filtered) {
+		m.previewLines = nil
+		return
+	}
+
+	idx := m.filtered[m.cursor]
+	m.previewLines = colorizeJSON(m.lines[idx].raw)
 }
 
 func (m *logViewModel) markCrashed() {
