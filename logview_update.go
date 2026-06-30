@@ -149,15 +149,15 @@ func (m logViewModel) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "N":
 		m.jumpToMatch(-1)
 	case "1":
-		m.setFilter("error")
+		m.setLevelFilter(levelError)
 	case "2":
-		m.setFilter("warn")
+		m.setLevelFilter(levelWarn)
 	case "3":
-		m.setFilter("info")
+		m.setLevelFilter(levelInfo)
 	case "4":
-		m.setFilter("debug")
+		m.setLevelFilter(levelDebug)
 	case "0":
-		m.setFilter("")
+		m.clearLevelFilter()
 	case "w":
 		m.wrap = !m.wrap
 	case "alt+enter":
@@ -300,6 +300,21 @@ func (m *logViewModel) markCrashed() {
 func (m *logViewModel) setFilter(f string) {
 	m.filter = f
 	m.filterLower = strings.ToLower(f)
+	m.applyFilterChange()
+}
+
+func (m *logViewModel) setLevelFilter(l level) {
+	m.levelFilter = l
+	m.hasLevelFilter = true
+	m.applyFilterChange()
+}
+
+func (m *logViewModel) clearLevelFilter() {
+	m.hasLevelFilter = false
+	m.applyFilterChange()
+}
+
+func (m *logViewModel) applyFilterChange() {
 	m.refilter()
 
 	if m.mode != modeSearch {
@@ -347,9 +362,13 @@ func (m *logViewModel) jumpToMatch(dir int) {
 }
 
 func (m logViewModel) matchFilter(e logEntry) bool {
-	if m.filter == "" {
-		return true
+	if m.hasLevelFilter && e.level != m.levelFilter {
+		return false
 	}
 
-	return strings.Contains(e.lower, m.filterLower)
+	if m.filter != "" && !strings.Contains(e.lower, m.filterLower) {
+		return false
+	}
+
+	return true
 }

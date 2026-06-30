@@ -39,6 +39,8 @@ type logViewModel struct {
 	height          int
 	filter          string
 	filterLower     string
+	levelFilter     level
+	hasLevelFilter  bool
 	preview         bool
 	previewOffset   int
 	previewLines    []string
@@ -100,6 +102,21 @@ const (
 	levelError
 	levelUnknown
 )
+
+func (l level) String() string {
+	switch l {
+	case levelError:
+		return "error"
+	case levelWarn:
+		return "warn"
+	case levelInfo:
+		return "info"
+	case levelDebug:
+		return "debug"
+	default:
+		return "unknown"
+	}
+}
 
 type logParser struct {
 	format     string
@@ -252,11 +269,23 @@ func extractKeyValue(line, key string) (string, bool) {
 	return "", false
 }
 
-var levelKeywords = []string{
-	"ERROR", "error",
-	"WARN", "WARNING", "warn", "warning",
-	"INFO", "info",
-	"DEBUG", "debug",
+var levelAliases = map[level][]string{
+	levelError: {"ERROR", "error"},
+	levelWarn:  {"WARN", "WARNING", "warn", "warning"},
+	levelInfo:  {"INFO", "info"},
+	levelDebug: {"DEBUG", "debug"},
+}
+
+// levelToken finds the keyword to colorize for an entry's own level, so a "warn"
+// line with "error" in its message colors "warn", not the unrelated "error".
+func levelToken(line string, l level) (string, int) {
+	for _, kw := range levelAliases[l] {
+		if idx := strings.Index(line, kw); idx >= 0 {
+			return kw, idx
+		}
+	}
+
+	return "", -1
 }
 
 func (e logEntry) render(selected bool, filter, filterLower, search, searchLower string, width int, highlightFields []string) string {
@@ -283,13 +312,9 @@ func (e logEntry) render(selected bool, filter, filterLower, search, searchLower
 		line = " " + line
 	}
 
-	for _, kw := range levelKeywords {
-		if idx := strings.Index(line, kw); idx >= 0 {
-			a := levelAffix[kw]
-			line = line[:idx] + a.pre + kw + a.suf + line[idx+len(kw):]
-
-			break
-		}
+	if kw, idx := levelToken(line, e.level); idx >= 0 {
+		a := levelAffix[kw]
+		line = line[:idx] + a.pre + kw + a.suf + line[idx+len(kw):]
 	}
 
 	for _, field := range highlightFields {

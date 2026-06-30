@@ -390,10 +390,12 @@ func TestUpdateNormalKeys(t *testing.T) {
 			assert.Equal(t, modeHighlightSearch, got.mode)
 		}},
 		{"1", func(t *testing.T, got logViewModel) {
-			assert.Equal(t, "error", got.filter)
+			assert.True(t, got.hasLevelFilter)
+			assert.Equal(t, levelError, got.levelFilter)
+			assert.Equal(t, "", got.filter)
 		}},
 		{"0", func(t *testing.T, got logViewModel) {
-			assert.Equal(t, "", got.filter)
+			assert.False(t, got.hasLevelFilter)
 		}},
 	}
 
@@ -528,9 +530,29 @@ func TestLogEntryRenderMarker(t *testing.T) {
 }
 
 func TestLogEntryRenderWithLevelKeywords(t *testing.T) {
-	entry := logEntry{raw: `level=ERROR msg="boom"`, lower: `level=error msg="boom"`}
+	entry := parseLine(`level=ERROR msg="boom"`)
 	out := entry.render(false, "", "", "", "", 80, nil)
 	assert.Contains(t, out, "ERROR")
+}
+
+func TestLevelToken(t *testing.T) {
+	tests := []struct {
+		name string
+		line string
+		lvl  level
+		want string
+	}{
+		{"warn line with error in msg colors warn", `{"level":"warn","msg":"client error"}`, levelWarn, "warn"},
+		{"error line colors error", `{"level":"error","msg":"internal error"}`, levelError, "error"},
+		{"info line with warn in msg colors info", `{"level":"info","msg":"warn user"}`, levelInfo, "info"},
+		{"unknown level colors nothing", `{"level":"warn","msg":"client error"}`, levelUnknown, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			kw, _ := levelToken(tt.line, tt.lvl)
+			assert.Equal(t, tt.want, kw)
+		})
+	}
 }
 
 func TestLogEntryRenderSelected(t *testing.T) {
@@ -706,6 +728,42 @@ func TestMatchFilter(t *testing.T) {
 	m.filter = "warn"
 	m.filterLower = "warn"
 	assert.False(t, m.matchFilter(entry))
+}
+
+func TestMatchLevelFilter(t *testing.T) {
+	warnWithError := parseLine(`{"level":"warn","msg":"client error","status":404}`)
+	errLine := parseLine(`{"level":"error","msg":"internal server error"}`)
+	infoLine := parseLine(`{"level":"info","msg":"ok"}`)
+
+	tests := []struct {
+		name   string
+		filter level
+		entry  logEntry
+		want   bool
+	}{
+		{"warn-with-error-substring excluded by error filter", levelError, warnWithError, false},
+		{"error line matches error filter", levelError, errLine, true},
+		{"warn line matches warn filter", levelWarn, warnWithError, true},
+		{"info line excluded by error filter", levelError, infoLine, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newModel()
+			m.hasLevelFilter = true
+			m.levelFilter = tt.filter
+			assert.Equal(t, tt.want, m.matchFilter(tt.entry))
+		})
+	}
+}
+
+func TestHeaderTextLevel(t *testing.T) {
+	m := newModel()
+	m.filtered = []int{0}
+	m.hasLevelFilter = true
+	m.levelFilter = levelError
+
+	assert.Contains(t, m.headerText(), "level: error")
+	assert.Contains(t, m.headerText(), "filter: all")
 }
 
 func TestAppendLineFiltered(t *testing.T) {
@@ -902,12 +960,13 @@ func TestUpdateNormalSearchMatch(t *testing.T) {
 
 func TestUpdateNormalFilterByLevel(t *testing.T) {
 	tests := []struct {
-		key    string
-		filter string
+		key   string
+		level level
 	}{
-		{"2", "warn"},
-		{"3", "info"},
-		{"4", "debug"},
+		{"1", levelError},
+		{"2", levelWarn},
+		{"3", levelInfo},
+		{"4", levelDebug},
 	}
 
 	for _, tt := range tests {
@@ -915,7 +974,9 @@ func TestUpdateNormalFilterByLevel(t *testing.T) {
 			m := makeModelWithLines(5)
 			updated, _ := m.Update(keyRunes(tt.key))
 			got := updated.(logViewModel)
-			assert.Equal(t, tt.filter, got.filter)
+			assert.True(t, got.hasLevelFilter)
+			assert.Equal(t, tt.level, got.levelFilter)
+			assert.Equal(t, "", got.filter)
 		})
 	}
 }

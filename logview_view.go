@@ -73,13 +73,18 @@ func (m logViewModel) View() string {
 }
 
 func (m logViewModel) headerText() string {
+	levelPart := ""
+	if m.hasLevelFilter {
+		levelPart = " | level: " + m.levelFilter.String()
+	}
+
 	searchPart := ""
 	if m.search != "" {
 		searchPart = " | search: " + m.search
 	}
 
-	return styleDim.Render(fmt.Sprintf(" %d lines | filter: %s%s | ?=help",
-		len(m.filtered), filterLabel(m.filter), searchPart))
+	return styleDim.Render(fmt.Sprintf(" %d lines | filter: %s%s%s | ?=help",
+		len(m.filtered), filterLabel(m.filter), levelPart, searchPart))
 }
 
 func (m logViewModel) footerText() string {
