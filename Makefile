@@ -15,7 +15,7 @@ install:
 	go install $(LDFLAGS) $(PKG)
 
 test:
-	go run $(PKG) test run
+	go test ./...
 
 lint:
 	golangci-lint run

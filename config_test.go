@@ -21,7 +21,6 @@ func TestDefaultConfig(t *testing.T) {
 	assert.Equal(t, []string{".go"}, cfg.Watch.Extensions)
 	assert.Equal(t, []string{"vendor", "node_modules"}, cfg.Watch.Exclude)
 	assert.Equal(t, 500*time.Millisecond, cfg.Watch.Debounce)
-	assert.Equal(t, "coverage.out", cfg.Test.CoverProfile)
 	assert.Equal(t, "auto", cfg.Logs.Format)
 	assert.Equal(t, "level", cfg.Logs.LevelField)
 	assert.Equal(t, []string{"error", "err", "fatal"}, cfg.Logs.LevelValues.Error)
@@ -52,11 +51,10 @@ func TestLoadConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "override env_file and test",
-			yaml: "run:\n  env_file: .env.local\ntest:\n  cover_profile: cover.out\n",
+			name: "override env_file",
+			yaml: "run:\n  env_file: .env.local\n",
 			assert: func(t *testing.T, cfg Config) {
 				assert.Equal(t, ".env.local", cfg.Run.EnvFile)
-				assert.Equal(t, "cover.out", cfg.Test.CoverProfile)
 			},
 		},
 		{

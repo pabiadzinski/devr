@@ -15,6 +15,3 @@ watch:
   extensions: [".go"]
   exclude: ["vendor", "node_modules"]
   debounce: 500ms
-
-test:
-  cover_profile: coverage.out

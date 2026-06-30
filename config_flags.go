@@ -13,12 +13,6 @@ func (cfg *Config) RunCLIFlags() []Flag {
 	}
 }
 
-func (cfg *Config) TestCLIFlags() []Flag {
-	return []Flag{
-		{Name: "profile", Short: "p", Usage: "Coverage profile path", Value: &cfg.Test.CoverProfile},
-	}
-}
-
 func joinFlags(groups ...[]Flag) []Flag {
 	var out []Flag
 

@@ -3,8 +3,6 @@ package devr
 func Register(c *CLI, a *App) {
 	c.Add(
 		cmdApp(a),
-		cmdTest(a),
-		cmdInit(a),
 		c.cmdCompletion(),
 	)
 }

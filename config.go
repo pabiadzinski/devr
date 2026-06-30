@@ -15,7 +15,6 @@ type Config struct {
 	Build  ConfigBuild `yaml:"build"`
 	Run    ConfigRun   `yaml:"run"`
 	Watch  ConfigWatch `yaml:"watch"`
-	Test   ConfigTest  `yaml:"test"`
 	Logs   ConfigLogs  `yaml:"logs"`
 	Notify bool        `yaml:"notify"`
 }
@@ -36,10 +35,6 @@ type ConfigWatch struct {
 	Extensions []string      `yaml:"extensions"`
 	Exclude    []string      `yaml:"exclude"`
 	Debounce   time.Duration `yaml:"debounce"`
-}
-
-type ConfigTest struct {
-	CoverProfile string `yaml:"cover_profile"`
 }
 
 type ConfigLogs struct {
@@ -70,9 +65,6 @@ func DefaultConfig() Config {
 			Extensions: []string{".go"},
 			Exclude:    []string{"vendor", "node_modules"},
 			Debounce:   500 * time.Millisecond,
-		},
-		Test: ConfigTest{
-			CoverProfile: "coverage.out",
 		},
 		Logs: ConfigLogs{
 			Format:     "auto",

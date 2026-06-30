@@ -32,7 +32,5 @@ func TestRegister(t *testing.T) {
 	}
 
 	assert.True(t, names["app"])
-	assert.True(t, names["test"])
-	assert.True(t, names["init"])
 	assert.True(t, names["completion"])
 }
