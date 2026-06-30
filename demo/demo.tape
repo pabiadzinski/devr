@@ -7,55 +7,47 @@ Set Height 700
 Set Padding 20
 Set Theme "Catppuccin Latte"
 
+# Build, run, and drop straight into the log viewer
 Type "devr app run"
 Enter
-Sleep 8s
+Sleep 9s
 
-# Navigate down
+# Vim-style navigation
 Type "jjjjj"
 Sleep 1.5s
 
-# Filter by error
+# Filter to errors only...
 Type "1"
 Sleep 2.5s
 
-# Filter by warn
+# ...then warnings
 Type "2"
 Sleep 2.5s
 
-# Show all
+# Back to everything
 Type "0"
 Sleep 1.5s
 
-# Search
+# Filter lines down to a single endpoint
 Type "/"
 Sleep 0.5s
-Type "users"
-Sleep 1.5s
+Type "/api/users"
+Sleep 1s
 Enter
 Sleep 2.5s
 
-# Clear filter
+# Clear the filter
 Type "0"
 Sleep 1.5s
 
-# Toggle JSON preview
+# Pretty-print the selected JSON line
 Tab
 Sleep 3s
-
-# Navigate in preview
 Type "jjj"
 Sleep 2s
-
-# Close preview
 Tab
 Sleep 1.5s
 
-# Quit
+# Detach — the app keeps running in the background
 Type "q"
-Sleep 1s
-
-# Run tests
-Type "devr test run"
-Enter
-Sleep 5s
+Sleep 1.5s
